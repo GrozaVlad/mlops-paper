@@ -1,0 +1,14 @@
+name: chemmlops-pyg
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.2
+  - scipy
+  - scikit-learn
+  - rdkit=2023.09.4
+  - pip
+  - pip:
+      - torch-geometric==2.5.0      # pulls matching binary wheels
+      - torchmetrics==1.3.0
