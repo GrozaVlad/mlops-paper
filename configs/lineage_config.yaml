@@ -1,0 +1,255 @@
+# Model Lineage Tracking Configuration
+
+lineage_tracking:
+  # Database configuration
+  database:
+    type: sqlite
+    path: data/lineage/model_lineage.db
+    backup_enabled: true
+    backup_frequency: daily
+    backup_retention_days: 30
+  
+  # MLflow integration
+  mlflow:
+    enabled: true
+    tracking_uri: "${MLFLOW_TRACKING_URI}"
+    auto_track_runs: true
+    track_artifacts: true
+    track_datasets: true
+  
+  # Relationship tracking
+  relationships:
+    # Model-to-model relationships
+    model_relationships:
+      - derived_from        # Model derived from another
+      - fine_tuned_from    # Model fine-tuned from base
+      - ensemble_member    # Part of an ensemble
+      - retrained_from     # Retrained version
+      - experiment_variant # Experimental variant
+      - a_b_test_variant   # A/B test variant
+      - rollback_from      # Rollback version
+      - merged_from        # Merged from multiple models
+    
+    # Model-to-data relationships
+    data_relationships:
+      - trained_on         # Training dataset
+      - validated_on       # Validation dataset
+      - tested_on          # Test dataset
+      - augmented_from     # Data augmentation source
+      - subset_of          # Subset relationship
+      - transformed_from   # Data transformation source
+  
+  # Automatic tracking rules
+  auto_tracking:
+    # Track on model registration
+    on_model_register: true
+    
+    # Track on stage transitions
+    on_stage_change: true
+    
+    # Track on retraining
+    on_retraining: true
+    
+    # Track on A/B test creation
+    on_ab_test: true
+    
+    # Track relationships from tags
+    infer_from_tags:
+      parent_run_id: derived_from
+      base_model_uri: fine_tuned_from
+      ensemble_id: ensemble_member
+      previous_version: retrained_from
+  
+  # Lineage visualization
+  visualization:
+    # Graph layout algorithm
+    layout: spring  # spring, hierarchical, circular, spectral
+    
+    # Node styling
+    node_colors:
+      None: "#E0E0E0"
+      Staging: "#FFE082"
+      Production: "#81C784"
+      Archived: "#BCAAA4"
+    
+    # Edge styling
+    edge_styles:
+      derived_from:
+        style: solid
+        color: blue
+        width: 2
+      fine_tuned_from:
+        style: dashed
+        color: green
+        width: 2
+      retrained_from:
+        style: dotted
+        color: orange
+        width: 2
+      a_b_test_variant:
+        style: dashdot
+        color: red
+        width: 1.5
+      ensemble_member:
+        style: solid
+        color: purple
+        width: 1.5
+    
+    # Export settings
+    export_formats:
+      - png
+      - pdf
+      - svg
+    default_dpi: 300
+    max_nodes_display: 100
+  
+  # Lineage analysis
+  analysis:
+    # Generation tracking
+    track_generations: true
+    
+    # Impact analysis
+    impact_analysis:
+      enabled: true
+      metrics_to_track:
+        - accuracy
+        - auc
+        - precision
+        - recall
+        - f1_score
+    
+    # Ancestry limits
+    max_ancestry_depth: 10
+    max_descendants_depth: 10
+  
+  # Data lineage
+  data_lineage:
+    # Track data versions
+    track_versions: true
+    
+    # Track data transformations
+    track_transformations: true
+    
+    # Track data quality
+    track_quality_metrics: true
+    
+    # Supported data sources
+    data_sources:
+      - s3
+      - local
+      - database
+      - api
+    
+    # Checksum calculation
+    calculate_checksums: true
+    checksum_algorithm: sha256
+  
+  # Reporting
+  reporting:
+    # Automatic report generation
+    auto_generate_reports: true
+    
+    # Report formats
+    report_formats:
+      - json
+      - html
+      - pdf
+    
+    # Report sections
+    include_sections:
+      - model_info
+      - ancestry_tree
+      - descendant_tree
+      - data_lineage
+      - performance_comparison
+      - relationship_timeline
+      - impact_analysis
+    
+    # Report storage
+    report_storage_path: reports/lineage/
+    
+    # Email notifications
+    email_notifications:
+      enabled: false
+      smtp_server: "${SMTP_SERVER}"
+      recipients:
+        - mlops-team@company.com
+  
+  # Export and backup
+  export:
+    # Automatic exports
+    auto_export:
+      enabled: true
+      frequency: weekly
+      formats:
+        - json
+        - yaml
+    
+    # Export destinations
+    destinations:
+      - type: s3
+        bucket: mlops-lineage-backup
+        prefix: lineage-exports/
+      - type: local
+        path: backups/lineage/
+    
+    # Compression
+    compress_exports: true
+    compression_format: gzip
+  
+  # Integration with other systems
+  integrations:
+    # Git integration
+    git:
+      enabled: true
+      track_commits: true
+      link_to_code: true
+    
+    # JIRA integration
+    jira:
+      enabled: false
+      project_key: MLOPS
+      link_issues: true
+    
+    # Slack notifications
+    slack:
+      enabled: true
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      notify_on:
+        - production_deployment
+        - model_retirement
+        - lineage_anomaly
+  
+  # Privacy and compliance
+  privacy:
+    # Anonymize user information
+    anonymize_users: false
+    
+    # Data retention
+    retention_policy:
+      lineage_data_days: 365
+      archived_models_days: 730
+    
+    # Audit logging
+    audit_logging:
+      enabled: true
+      log_all_queries: true
+      log_modifications: true
+  
+  # Performance optimization
+  performance:
+    # Cache settings
+    cache:
+      enabled: true
+      ttl_seconds: 3600
+      max_size_mb: 1024
+    
+    # Query optimization
+    query_optimization:
+      use_indexes: true
+      batch_size: 1000
+    
+    # Graph limits
+    graph_limits:
+      max_nodes_in_memory: 10000
+      max_edges_in_memory: 50000

@@ -1,0 +1,6 @@
+drug_id,target_id,interaction_type,binding_affinity,confidence_score,smiles,interaction_probability,predicted_interaction
+CHEMBL25,ENSP001,inhibitor,7.2,0.95,CC(=O)OC1=CC=CC=C1C(=O)O,0.49055064,0
+CHEMBL53,ENSP002,agonist,6.8,0.87,CC(C)CC1=CC=C(C=C1)C(C(=O)O)C,0.49089155,0
+CHEMBL85,ENSP003,antagonist,5.9,0.76,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,0.49443,0
+CHEMBL123,ENSP001,inhibitor,8.1,0.92,CC(=O)NC1=CC=C(C=C1)O,0.48974597,0
+CHEMBL456,ENSP002,agonist,6.5,0.84,CN1CCC23C4C(=O)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O,0.49127263,0

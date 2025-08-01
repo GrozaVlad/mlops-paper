@@ -1,0 +1,333 @@
+[
+  {
+    "dataset_name": "drug_target_interactions",
+    "total_rows": 5,
+    "total_columns": 5,
+    "missing_columns": [],
+    "extra_columns": [
+      "binding_affinity",
+      "confidence_score"
+    ],
+    "missing_data_percentage": {
+      "drug_id": 0.0,
+      "target_id": 0.0,
+      "interaction_type": 0.0,
+      "binding_affinity": 0.0,
+      "confidence_score": 0.0
+    },
+    "data_types": {
+      "drug_id": "object",
+      "target_id": "object",
+      "interaction_type": "object",
+      "binding_affinity": "float64",
+      "confidence_score": "float64"
+    },
+    "validation_passed": true,
+    "issues": [],
+    "duplicate_interactions": 0,
+    "unique_interaction_types": 3,
+    "interaction_type_counts": {
+      "inhibitor": 2,
+      "agonist": 2,
+      "antagonist": 1
+    },
+    "binding_affinity_stats": {
+      "min": 5.9,
+      "max": 8.1,
+      "mean": 6.9,
+      "std": 0.8215838362577489
+    },
+    "great_expectations": {
+      "total_expectations": 5,
+      "successful_expectations": 4,
+      "success_rate": 0.8,
+      "expectations_details": {
+        "expect_table_row_count_to_be_between": {
+          "success": false,
+          "result": {
+            "observed_value": 5
+          }
+        },
+        "expect_column_to_exist_drug_id": {
+          "success": true,
+          "result": {}
+        },
+        "expect_column_values_to_not_be_null_drug_id": {
+          "success": true,
+          "result": {
+            "element_count": 5,
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0,
+            "unexpected_percent_total": 0.0,
+            "partial_unexpected_list": []
+          }
+        },
+        "expect_column_to_exist_target_id": {
+          "success": true,
+          "result": {}
+        },
+        "expect_column_values_to_not_be_null_target_id": {
+          "success": true,
+          "result": {
+            "element_count": 5,
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0,
+            "unexpected_percent_total": 0.0,
+            "partial_unexpected_list": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "dataset_name": "drug_metadata",
+    "total_rows": 5,
+    "total_columns": 5,
+    "missing_columns": [],
+    "extra_columns": [
+      "molecular_weight",
+      "logp"
+    ],
+    "missing_data_percentage": {
+      "drug_id": 0.0,
+      "drug_name": 0.0,
+      "smiles": 0.0,
+      "molecular_weight": 0.0,
+      "logp": 0.0
+    },
+    "data_types": {
+      "drug_id": "object",
+      "drug_name": "object",
+      "smiles": "object",
+      "molecular_weight": "float64",
+      "logp": "float64"
+    },
+    "validation_passed": true,
+    "issues": [],
+    "valid_molecules": 5,
+    "invalid_molecules": 0,
+    "validity_rate": 1.0,
+    "molecular_properties_summary": {
+      "molecular_weight": {
+        "count": 5.0,
+        "mean": 206.629,
+        "std": 56.79396122388365,
+        "min": 151.165,
+        "25%": 180.15899999999996,
+        "50%": 194.194,
+        "75%": 206.28499999999997,
+        "max": 301.342
+      },
+      "logp": {
+        "count": 5.0,
+        "mean": 1.08996,
+        "std": 1.471373349289704,
+        "min": -1.0293,
+        "25%": 0.7451999999999996,
+        "50%": 1.3101,
+        "75%": 1.3505999999999998,
+        "max": 3.073200000000001
+      },
+      "hbd": {
+        "count": 5.0,
+        "mean": 1.2,
+        "std": 0.8366600265340756,
+        "min": 0.0,
+        "25%": 1.0,
+        "50%": 1.0,
+        "75%": 2.0,
+        "max": 2.0
+      },
+      "hba": {
+        "count": 5.0,
+        "mean": 3.4,
+        "std": 2.073644135332772,
+        "min": 1.0,
+        "25%": 2.0,
+        "50%": 3.0,
+        "75%": 5.0,
+        "max": 6.0
+      },
+      "rotatable_bonds": {
+        "count": 5.0,
+        "mean": 1.4,
+        "std": 1.6733200530681511,
+        "min": 0.0,
+        "25%": 0.0,
+        "50%": 1.0,
+        "75%": 2.0,
+        "max": 4.0
+      },
+      "aromatic_rings": {
+        "count": 5.0,
+        "mean": 1.2,
+        "std": 0.4472135954999579,
+        "min": 1.0,
+        "25%": 1.0,
+        "50%": 1.0,
+        "75%": 1.0,
+        "max": 2.0
+      }
+    },
+    "molecular_properties_stats": {
+      "molecular_weight": {
+        "count": 5.0,
+        "mean": 206.629,
+        "std": 56.79396122388365,
+        "min": 151.165,
+        "25%": 180.15899999999996,
+        "50%": 194.194,
+        "75%": 206.28499999999997,
+        "max": 301.342
+      },
+      "logp": {
+        "count": 5.0,
+        "mean": 1.08996,
+        "std": 1.471373349289704,
+        "min": -1.0293,
+        "25%": 0.7451999999999996,
+        "50%": 1.3101,
+        "75%": 1.3505999999999998,
+        "max": 3.073200000000001
+      },
+      "hbd": {
+        "count": 5.0,
+        "mean": 1.2,
+        "std": 0.8366600265340756,
+        "min": 0.0,
+        "25%": 1.0,
+        "50%": 1.0,
+        "75%": 2.0,
+        "max": 2.0
+      },
+      "hba": {
+        "count": 5.0,
+        "mean": 3.4,
+        "std": 2.073644135332772,
+        "min": 1.0,
+        "25%": 2.0,
+        "50%": 3.0,
+        "75%": 5.0,
+        "max": 6.0
+      },
+      "rotatable_bonds": {
+        "count": 5.0,
+        "mean": 1.4,
+        "std": 1.6733200530681511,
+        "min": 0.0,
+        "25%": 0.0,
+        "50%": 1.0,
+        "75%": 2.0,
+        "max": 4.0
+      },
+      "aromatic_rings": {
+        "count": 5.0,
+        "mean": 1.2,
+        "std": 0.4472135954999579,
+        "min": 1.0,
+        "25%": 1.0,
+        "50%": 1.0,
+        "75%": 1.0,
+        "max": 2.0
+      }
+    },
+    "molecular_weight_stats": {
+      "min": 151.16,
+      "max": 285.34,
+      "mean": 203.426
+    },
+    "great_expectations": {
+      "total_expectations": 3,
+      "successful_expectations": 2,
+      "success_rate": 0.6666666666666666,
+      "expectations_details": {
+        "expect_table_row_count_to_be_between": {
+          "success": false,
+          "result": {
+            "observed_value": 5
+          }
+        },
+        "expect_column_values_to_not_be_null_smiles": {
+          "success": true,
+          "result": {
+            "element_count": 5,
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0,
+            "unexpected_percent_total": 0.0,
+            "partial_unexpected_list": []
+          }
+        },
+        "expect_column_value_lengths_to_be_between_smiles": {
+          "success": true,
+          "result": {
+            "element_count": 5,
+            "missing_count": 0,
+            "missing_percent": 0.0,
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0,
+            "unexpected_percent_total": 0.0,
+            "unexpected_percent_nonmissing": 0.0,
+            "partial_unexpected_list": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "dataset_name": "target_metadata",
+    "total_rows": 3,
+    "total_columns": 5,
+    "missing_columns": [],
+    "extra_columns": [
+      "organism",
+      "target_class"
+    ],
+    "missing_data_percentage": {
+      "target_id": 0.0,
+      "target_name": 0.0,
+      "uniprot_id": 0.0,
+      "target_class": 0.0,
+      "organism": 0.0
+    },
+    "data_types": {
+      "target_id": "object",
+      "target_name": "object",
+      "uniprot_id": "object",
+      "target_class": "object",
+      "organism": "object"
+    },
+    "validation_passed": true,
+    "issues": [],
+    "invalid_uniprot_count": 0,
+    "target_class_distribution": {
+      "enzyme": 2,
+      "GPCR": 1
+    },
+    "great_expectations": {
+      "total_expectations": 2,
+      "successful_expectations": 1,
+      "success_rate": 0.5,
+      "expectations_details": {
+        "expect_table_row_count_to_be_between": {
+          "success": false,
+          "result": {
+            "observed_value": 3
+          }
+        },
+        "expect_column_values_to_match_regex_uniprot": {
+          "success": true,
+          "result": {
+            "element_count": 3,
+            "missing_count": 0,
+            "missing_percent": 0.0,
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0,
+            "unexpected_percent_total": 0.0,
+            "unexpected_percent_nonmissing": 0.0,
+            "partial_unexpected_list": []
+          }
+        }
+      }
+    }
+  }
+]

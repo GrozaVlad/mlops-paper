@@ -1,0 +1,4 @@
+source,drug_id,target_id,interaction_type,binding_affinity,confidence_score,evidence_quality,annotation_status,drug_name,smiles,molecular_weight,logp,target_name,uniprot_id,organism,target_class
+sample,CHEMBL85,ENSP003,antagonist,5.9,0.76,medium,verified,Caffeine,CN1C=NC2=C1C(=O)N(C(=O)N2C)C,194.19,-0.07,Adenosine receptor A2A,P29274,Homo sapiens,GPCR
+sample,CHEMBL123,ENSP001,inhibitor,8.1,0.92,medium,verified,Paracetamol,CC(=O)NC1=CC=C(C=C1)O,151.16,0.46,COX-1,P23219,Homo sapiens,enzyme
+sample,CHEMBL53,ENSP002,agonist,6.8,0.87,medium,verified,Ibuprofen,CC(C)CC1=CC=C(C=C1)C(C(=O)O)C,206.28,3.97,COX-2,P35354,Homo sapiens,enzyme

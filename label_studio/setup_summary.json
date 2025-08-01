@@ -1,0 +1,11 @@
+{
+  "setup_timestamp": "2025-07-26T17:37:49.000082",
+  "label_studio_directory": "label_studio",
+  "configuration_file": "label_studio/drug_target_label_config.xml",
+  "annotation_dataset": "label_studio/annotation_dataset.json",
+  "task_count": 5,
+  "guidelines_file": "label_studio/annotation_guidelines.md",
+  "startup_script": "label_studio/start_label_studio.sh",
+  "import_script": "label_studio/import_project.py",
+  "setup_status": "completed"
+}

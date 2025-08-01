@@ -1,0 +1,335 @@
+# Logstash Deployment for DrugBAN Log Processing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: monitoring
+  labels:
+    app: logstash
+data:
+  logstash.yml: |
+    http.host: "0.0.0.0"
+    path.config: /usr/share/logstash/pipeline
+    path.logs: /usr/share/logstash/logs
+    
+    # Performance settings
+    pipeline.workers: 2
+    pipeline.batch.size: 125
+    pipeline.batch.delay: 5
+    
+    # Monitoring
+    xpack.monitoring.enabled: false
+    
+    # Logging
+    log.level: info
+
+  logstash.conf: |
+    input {
+      # Beats input for log forwarding
+      beats {
+        port => 5044
+      }
+      
+      # HTTP input for direct log ingestion
+      http {
+        port => 8080
+        codec => json
+      }
+      
+      # Syslog input
+      syslog {
+        port => 5514
+      }
+    }
+
+    filter {
+      # Parse timestamps
+      date {
+        match => [ "timestamp", "ISO8601" ]
+        target => "@timestamp"
+      }
+      
+      # Add metadata based on source
+      if [fields][service] == "drugban-api" {
+        mutate {
+          add_field => { "service_type" => "api" }
+          add_field => { "component" => "drugban" }
+        }
+        
+        # Parse API logs
+        if [message] =~ /prediction/ {
+          grok {
+            match => { 
+              "message" => "%{TIMESTAMP_ISO8601:log_timestamp} %{LOGLEVEL:log_level} %{DATA:logger} - %{GREEDYDATA:log_message}"
+            }
+          }
+          
+          # Extract prediction metrics
+          if [log_message] =~ /prediction_id/ {
+            grok {
+              match => {
+                "log_message" => "prediction_id=%{DATA:prediction_id} drug_id=%{DATA:drug_id} target_id=%{DATA:target_id} confidence=%{NUMBER:confidence:float} latency=%{NUMBER:latency:float}"
+              }
+            }
+          }
+        }
+      }
+      
+      # Model performance logs
+      if [fields][service] == "drugban-model" {
+        mutate {
+          add_field => { "service_type" => "model" }
+          add_field => { "component" => "drugban" }
+        }
+        
+        # Parse model metrics
+        if [message] =~ /accuracy|precision|recall|f1_score/ {
+          grok {
+            match => {
+              "message" => "metric=%{DATA:metric_name} value=%{NUMBER:metric_value:float} window_size=%{NUMBER:window_size:int}"
+            }
+          }
+        }
+      }
+      
+      # Drift detection logs
+      if [fields][service] == "drugban-drift" {
+        mutate {
+          add_field => { "service_type" => "drift_detection" }
+          add_field => { "component" => "drugban" }
+        }
+        
+        # Parse drift metrics
+        if [message] =~ /drift_score/ {
+          grok {
+            match => {
+              "message" => "drift_type=%{DATA:drift_type} drift_score=%{NUMBER:drift_score:float} threshold=%{NUMBER:threshold:float} drift_detected=%{WORD:drift_detected}"
+            }
+          }
+        }
+      }
+      
+      # Kubernetes logs
+      if [kubernetes] {
+        mutate {
+          add_field => { "k8s_namespace" => "%{[kubernetes][namespace]}" }
+          add_field => { "k8s_pod" => "%{[kubernetes][pod]}" }
+          add_field => { "k8s_container" => "%{[kubernetes][container]}" }
+        }
+      }
+      
+      # Error detection and classification
+      if [log_level] == "ERROR" or [message] =~ /(?i)error|exception|failed|timeout/ {
+        mutate {
+          add_field => { "alert_severity" => "high" }
+          add_tag => [ "error" ]
+        }
+        
+        # Classify error types
+        if [message] =~ /(?i)timeout/ {
+          mutate { add_tag => [ "timeout_error" ] }
+        } else if [message] =~ /(?i)connection/ {
+          mutate { add_tag => [ "connection_error" ] }
+        } else if [message] =~ /(?i)model|prediction/ {
+          mutate { add_tag => [ "model_error" ] }
+        } else if [message] =~ /(?i)drift/ {
+          mutate { add_tag => [ "drift_error" ] }
+        }
+      }
+      
+      # Warning detection
+      if [log_level] == "WARN" or [message] =~ /(?i)warning|warn/ {
+        mutate {
+          add_field => { "alert_severity" => "medium" }
+          add_tag => [ "warning" ]
+        }
+      }
+      
+      # Performance metrics extraction
+      if [message] =~ /latency|response_time|duration/ {
+        grok {
+          match => {
+            "message" => "latency=%{NUMBER:response_latency:float}|response_time=%{NUMBER:response_latency:float}|duration=%{NUMBER:response_latency:float}"
+          }
+        }
+        
+        # Categorize latency
+        if [response_latency] {
+          if [response_latency] > 1.0 {
+            mutate { add_tag => [ "high_latency" ] }
+          } else if [response_latency] > 0.5 {
+            mutate { add_tag => [ "medium_latency" ] }
+          } else {
+            mutate { add_tag => [ "normal_latency" ] }
+          }
+        }
+      }
+      
+      # Remove unnecessary fields
+      mutate {
+        remove_field => [ "beat", "input", "agent", "ecs" ]
+      }
+    }
+
+    output {
+      # Main Elasticsearch output
+      elasticsearch {
+        hosts => ["elasticsearch:9200"]
+        index => "drugban-logs-%{+YYYY.MM.dd}"
+        template_name => "drugban-logs"
+        template_pattern => "drugban-logs-*"
+        template => {
+          "index_patterns" => ["drugban-logs-*"],
+          "settings" => {
+            "number_of_shards" => 1,
+            "number_of_replicas" => 0,
+            "index.refresh_interval" => "5s"
+          },
+          "mappings" => {
+            "properties" => {
+              "@timestamp" => { "type" => "date" },
+              "message" => { "type" => "text" },
+              "log_level" => { "type" => "keyword" },
+              "service_type" => { "type" => "keyword" },
+              "component" => { "type" => "keyword" },
+              "prediction_id" => { "type" => "keyword" },
+              "drug_id" => { "type" => "keyword" },
+              "target_id" => { "type" => "keyword" },
+              "confidence" => { "type" => "float" },
+              "latency" => { "type" => "float" },
+              "response_latency" => { "type" => "float" },
+              "metric_name" => { "type" => "keyword" },
+              "metric_value" => { "type" => "float" },
+              "drift_type" => { "type" => "keyword" },
+              "drift_score" => { "type" => "float" },
+              "drift_detected" => { "type" => "boolean" },
+              "k8s_namespace" => { "type" => "keyword" },
+              "k8s_pod" => { "type" => "keyword" },
+              "k8s_container" => { "type" => "keyword" },
+              "alert_severity" => { "type" => "keyword" },
+              "tags" => { "type" => "keyword" }
+            }
+          }
+        }
+      }
+      
+      # Separate index for errors
+      if "error" in [tags] {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "drugban-errors-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Separate index for performance metrics
+      if [response_latency] or [metric_name] {
+        elasticsearch {
+          hosts => ["elasticsearch:9200"]
+          index => "drugban-metrics-%{+YYYY.MM.dd}"
+        }
+      }
+      
+      # Debug output (can be disabled in production)
+      # stdout { codec => rubydebug }
+    }
+
+  pipelines.yml: |
+    - pipeline.id: main
+      path.config: "/usr/share/logstash/pipeline/logstash.conf"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: monitoring
+  labels:
+    app: logstash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: logstash
+          image: logstash:8.5.0
+          env:
+            - name: LS_JAVA_OPTS
+              value: "-Xmx512m -Xms512m"
+          ports:
+            - containerPort: 5044
+              name: beats
+            - containerPort: 8080
+              name: http
+            - containerPort: 5514
+              name: syslog
+            - containerPort: 9600
+              name: monitoring
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: logstash-config-volume
+              mountPath: /usr/share/logstash/config/logstash.yml
+              subPath: logstash.yml
+            - name: logstash-config-volume
+              mountPath: /usr/share/logstash/pipeline/logstash.conf
+              subPath: logstash.conf
+            - name: logstash-config-volume
+              mountPath: /usr/share/logstash/config/pipelines.yml
+              subPath: pipelines.yml
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9600
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9600
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 10
+      volumes:
+        - name: logstash-config-volume
+          configMap:
+            name: logstash-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash
+  namespace: monitoring
+  labels:
+    app: logstash
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5044
+      targetPort: 5044
+      name: beats
+    - port: 8080
+      targetPort: 8080
+      name: http
+    - port: 5514
+      targetPort: 5514
+      name: syslog
+    - port: 9600
+      targetPort: 9600
+      name: monitoring
+  selector:
+    app: logstash

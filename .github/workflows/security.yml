@@ -1,0 +1,502 @@
+name: Security Scanning and Compliance
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly security scan on Mondays at 6 AM UTC
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/drugban-api
+
+jobs:
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install safety bandit semgrep
+        
+    - name: Run Safety dependency scan
+      run: |
+        safety check --json --output safety-report.json || true
+        safety check --short-report
+        
+    - name: Run Bandit security scan
+      run: |
+        bandit -r api/ scripts/ monitoring/ -f json -o bandit-report.json || true
+        bandit -r api/ scripts/ monitoring/ -ll
+        
+    - name: Run Semgrep static analysis
+      run: |
+        semgrep --config=auto --json --output=semgrep-report.json api/ scripts/ monitoring/ || true
+        semgrep --config=auto api/ scripts/ monitoring/
+        
+    - name: Check for hardcoded secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+        
+    - name: Generate security summary
+      run: |
+        python scripts/security/generate_security_summary.py \
+          --safety-report safety-report.json \
+          --bandit-report bandit-report.json \
+          --semgrep-report semgrep-report.json \
+          --output security_summary.json
+          
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports-${{ github.sha }}
+        path: |
+          safety-report.json
+          bandit-report.json
+          semgrep-report.json
+          security_summary.json
+        retention-days: 90
+        
+    - name: Comment PR with security summary
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = JSON.parse(fs.readFileSync('security_summary.json', 'utf8'));
+          
+          const comment = `## 🔒 Security Scan Results
+          
+          **Dependency Vulnerabilities:** ${summary.safety.total_vulnerabilities}
+          **Security Issues:** ${summary.bandit.total_issues}
+          **Static Analysis Findings:** ${summary.semgrep.total_findings}
+          
+          ${summary.safety.total_vulnerabilities > 0 ? '⚠️ **Action Required:** Please review and fix dependency vulnerabilities' : '✅ No dependency vulnerabilities found'}
+          ${summary.bandit.total_issues > 0 ? '⚠️ **Action Required:** Please review and fix security issues' : '✅ No security issues found'}
+          
+          <details>
+          <summary>View detailed results</summary>
+          
+          ### Safety Results
+          \`\`\`
+          ${summary.safety.summary}
+          \`\`\`
+          
+          ### Bandit Results
+          \`\`\`
+          ${summary.bandit.summary}
+          \`\`\`
+          
+          </details>`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
+
+  container-scan:
+    name: Container Image Security Scan
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build test image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        load: true
+        tags: drugban-test:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'drugban-test:latest'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Run Trivy filesystem scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        output: 'trivy-fs-results.txt'
+        
+    - name: Run Docker Scout vulnerability scan
+      uses: docker/scout-action@v1
+      with:
+        command: cves
+        image: drugban-test:latest
+        format: sarif
+        output: scout-results.sarif
+        
+    - name: Run Grype vulnerability scanner
+      uses: anchore/scan-action@v3
+      with:
+        image: drugban-test:latest
+        format: sarif
+        output-file: grype-results.sarif
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+        category: 'trivy'
+        
+    - name: Upload Scout scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'scout-results.sarif'
+        category: 'docker-scout'
+        
+    - name: Upload Grype scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'grype-results.sarif'
+        category: 'grype'
+        
+    - name: Generate container security report
+      run: |
+        python scripts/security/generate_container_report.py \
+          --trivy-sarif trivy-results.sarif \
+          --scout-sarif scout-results.sarif \
+          --grype-sarif grype-results.sarif \
+          --output container_security_report.json
+          
+    - name: Upload container security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: container-security-reports-${{ github.sha }}
+        path: |
+          trivy-results.sarif
+          scout-results.sarif
+          grype-results.sarif
+          trivy-fs-results.txt
+          container_security_report.json
+        retention-days: 90
+
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install pip-licenses
+      run: |
+        pip install pip-licenses pip-audit
+        
+    - name: Install project dependencies
+      run: |
+        pip install -r requirements.txt
+        
+    - name: Check license compatibility
+      run: |
+        pip-licenses --format json --output-file licenses.json
+        pip-licenses --format table --output-file licenses.txt
+        
+    - name: Audit for known vulnerabilities
+      run: |
+        pip-audit --format json --output audit-report.json || true
+        pip-audit --format table
+        
+    - name: Check for GPL contamination
+      run: |
+        python scripts/security/check_license_compliance.py \
+          --licenses-file licenses.json \
+          --allowed-licenses configs/allowed_licenses.json \
+          --output license_compliance_report.json
+          
+    - name: Upload license reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: license-reports-${{ github.sha }}
+        path: |
+          licenses.json
+          licenses.txt
+          audit-report.json
+          license_compliance_report.json
+        retention-days: 365
+
+  infrastructure-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Checkov IaC scan
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: .
+        framework: kubernetes,dockerfile,terraform
+        output_format: sarif
+        output_file_path: checkov-results.sarif
+        
+    - name: Run Kube-score
+      run: |
+        curl -L https://github.com/zegl/kube-score/releases/latest/download/kube-score_linux_amd64.tar.gz | tar xz
+        chmod +x kube-score
+        
+        # Scan Kubernetes manifests
+        find k8s/ -name "*.yaml" -exec ./kube-score score {} \; > kube-score-results.txt || true
+        
+    - name: Run OPA Conftest
+      run: |
+        curl -L https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_linux_amd64.tar.gz | tar xz
+        chmod +x conftest
+        
+        # Scan with security policies
+        ./conftest verify --policy configs/security-policies/ k8s/ > conftest-results.txt || true
+        
+    - name: Run Hadolint Dockerfile scan
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: Dockerfile
+        format: sarif
+        output-file: hadolint-results.sarif
+        
+    - name: Upload Checkov results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: checkov-results.sarif
+        category: 'checkov'
+        
+    - name: Upload Hadolint results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: hadolint-results.sarif
+        category: 'hadolint'
+        
+    - name: Upload infrastructure scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: infrastructure-scan-results-${{ github.sha }}
+        path: |
+          checkov-results.sarif
+          hadolint-results.sarif
+          kube-score-results.txt
+          conftest-results.txt
+        retention-days: 90
+
+  compliance-validation:
+    name: Regulatory Compliance Validation
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, container-scan, license-compliance, infrastructure-scan]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all security reports
+      uses: actions/download-artifact@v3
+      with:
+        pattern: "*-reports-${{ github.sha }}"
+        path: security-reports/
+        merge-multiple: true
+        
+    - name: Run FDA 21 CFR Part 11 compliance check
+      run: |
+        python scripts/compliance/fda_compliance_check.py \
+          --security-reports security-reports/ \
+          --audit-trail logs/audit/ \
+          --output fda_compliance_report.json
+          
+    - name: Run GDPR compliance check
+      run: |
+        python scripts/compliance/gdpr_compliance_check.py \
+          --data-processing-records configs/data_processing.json \
+          --privacy-policies docs/privacy/ \
+          --output gdpr_compliance_report.json
+          
+    - name: Run SOC 2 compliance check
+      run: |
+        python scripts/compliance/soc2_compliance_check.py \
+          --security-controls configs/security_controls.json \
+          --monitoring-evidence monitoring/ \
+          --output soc2_compliance_report.json
+          
+    - name: Generate compliance dashboard
+      run: |
+        python scripts/compliance/generate_compliance_dashboard.py \
+          --fda-report fda_compliance_report.json \
+          --gdpr-report gdpr_compliance_report.json \
+          --soc2-report soc2_compliance_report.json \
+          --output compliance_dashboard.html
+          
+    - name: Upload compliance reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-reports-${{ github.sha }}
+        path: |
+          fda_compliance_report.json
+          gdpr_compliance_report.json
+          soc2_compliance_report.json
+          compliance_dashboard.html
+        retention-days: 2555  # 7 years for regulatory compliance
+        
+    - name: Archive compliance evidence
+      run: |
+        # Create compliance package for regulatory submission
+        python scripts/compliance/create_compliance_package.py \
+          --security-reports security-reports/ \
+          --compliance-reports . \
+          --version ${{ github.sha }} \
+          --output compliance_package_${{ github.sha }}.zip
+          
+    - name: Upload compliance package
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-package-${{ github.sha }}
+        path: compliance_package_${{ github.sha }}.zip
+        retention-days: 2555
+
+  security-notification:
+    name: Security Notification
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, container-scan, license-compliance, infrastructure-scan, compliance-validation]
+    if: always()
+    
+    steps:
+    - name: Download security summary
+      uses: actions/download-artifact@v3
+      with:
+        name: security-reports-${{ github.sha }}
+        path: ./
+        
+    - name: Check for critical vulnerabilities
+      id: check
+      run: |
+        # Parse security summary for critical issues
+        python -c "
+import json
+import sys
+
+try:
+    with open('security_summary.json', 'r') as f:
+        summary = json.load(f)
+    
+    critical_issues = 0
+    critical_issues += summary.get('safety', {}).get('critical_vulnerabilities', 0)
+    critical_issues += summary.get('bandit', {}).get('high_severity_issues', 0)
+    
+    print(f'critical_issues={critical_issues}')
+    
+    if critical_issues > 0:
+        sys.exit(1)
+except FileNotFoundError:
+    print('critical_issues=0')
+    sys.exit(0)
+" >> $GITHUB_OUTPUT
+        
+    - name: Notify security team on critical findings
+      if: failure()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'failure'
+        channel: '#security-alerts'
+        text: |
+          🚨 **CRITICAL SECURITY FINDINGS DETECTED** 🚨
+          
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+          
+          **Action Required:**
+          - Review security scan results immediately
+          - Address critical vulnerabilities before deployment
+          - Update dependencies and fix security issues
+          
+          **Scan Results:** Available in GitHub Actions artifacts
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SECURITY_SLACK_WEBHOOK }}
+        
+    - name: Create security issue on critical findings
+      if: failure() && github.event_name == 'push'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const issue = await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Critical Security Vulnerabilities Detected - ${context.sha.substr(0, 7)}`,
+            body: `## Critical Security Findings
+            
+            **Commit:** ${context.sha}
+            **Branch:** ${context.ref}
+            **Scan Date:** ${new Date().toISOString()}
+            
+            Critical security vulnerabilities have been detected in the latest commit. 
+            
+            **Required Actions:**
+            1. Review security scan artifacts in GitHub Actions
+            2. Address all critical and high-severity findings
+            3. Update vulnerable dependencies
+            4. Re-run security scans to verify fixes
+            
+            **Artifacts:**
+            - Security Reports: \`security-reports-${context.sha}\`
+            - Container Security: \`container-security-reports-${context.sha}\`
+            - Compliance Reports: \`compliance-reports-${context.sha}\`
+            
+            **⚠️ Deployment should be blocked until these issues are resolved.**`,
+            labels: ['security', 'critical', 'bug']
+          });
+          
+          console.log('Created security issue:', issue.data.number);
+        
+    - name: Notify on successful scan
+      if: success()
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'success'
+        channel: '#drugban-security'
+        text: |
+          ✅ Security scan completed successfully
+          
+          Repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
+          
+          All security checks passed with no critical findings.
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

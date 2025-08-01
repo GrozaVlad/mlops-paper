@@ -1,0 +1,23 @@
+artifact_path: /Users/grozavlad/Projects/MLOpsProject/mlflow_artifacts/drug_repurposing_baseline/models/m-d89547d6d03742a381a87338c504521f/artifacts
+flavors:
+  python_function:
+    config:
+      device: null
+    data: data
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.pytorch
+    pickle_module_name: mlflow.pytorch.pickle_module
+    python_version: 3.10.18
+  pytorch:
+    code: null
+    model_data: data
+    pytorch_version: 2.7.1
+mlflow_version: 3.1.4
+model_id: m-d89547d6d03742a381a87338c504521f
+model_size_bytes: 14713059
+model_uuid: m-d89547d6d03742a381a87338c504521f
+prompts: null
+run_id: 4abac464febc4e9db931da01f00c3f0b
+utc_time_created: '2025-07-26 14:00:37.655996'

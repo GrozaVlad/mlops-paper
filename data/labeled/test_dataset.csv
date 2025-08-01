@@ -1,0 +1,3 @@
+source,drug_id,target_id,interaction_type,binding_affinity,confidence_score,evidence_quality,annotation_status,drug_name,smiles,molecular_weight,logp,target_name,uniprot_id,organism,target_class
+bindingdb,bindingdb_drug_0,bindingdb_target_0,binding,,0.8,high,pre_labeled,,,,,,,Homo sapiens,
+bindingdb,bindingdb_drug_1,bindingdb_target_1,binding,,0.8,high,pre_labeled,,,,,,,Homo sapiens,

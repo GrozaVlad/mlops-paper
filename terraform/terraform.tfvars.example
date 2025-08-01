@@ -1,0 +1,25 @@
+# AWS Configuration
+aws_region = "us-west-2"
+
+# Project Configuration
+project_name = "mlops-drug-repurposing"
+environment  = "dev"
+
+# Network Configuration
+vpc_cidr           = "10.0.0.0/16"
+enable_nat_gateway = true
+
+# EKS Configuration
+eks_cluster_version = "1.27"
+
+# RDS Configuration
+rds_instance_class = "db.t3.micro"
+
+# Example for production environment:
+# aws_region = "us-west-2"
+# project_name = "mlops-drug-repurposing"
+# environment = "prod"
+# vpc_cidr = "10.0.0.0/16"
+# enable_nat_gateway = true
+# eks_cluster_version = "1.27"
+# rds_instance_class = "db.t3.small"

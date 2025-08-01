@@ -1,0 +1,110 @@
+stages:
+  data_download:
+    cmd: python data/download_datasets.py
+    deps:
+      - data/download_datasets.py
+    outs:
+      - data/raw/sample/
+      - data/raw/biosnap/
+      - data/raw/bindingdb/
+
+  data_validation:
+    cmd: python scripts/validate_data.py
+    deps:
+      - scripts/validate_data.py
+      - data/raw/sample/
+      - params.yaml
+    outs:
+      - data/validation_report.json
+      - data/validation_outputs/data_validation_summary.png
+    metrics:
+      - data/validation_metrics.json
+
+  great_expectations_validation:
+    cmd: python scripts/simple_expectations_validation.py
+    deps:
+      - scripts/simple_expectations_validation.py
+      - data/raw/sample/
+    outs:
+      - data/great_expectations_validation.json
+
+  data_quality_dashboard:
+    cmd: python scripts/data_quality_dashboard_simple.py
+    deps:
+      - scripts/data_quality_dashboard_simple.py
+      - data/validation_report.json
+      - data/validation_metrics.json
+    outs:
+      - data/validation_outputs/data_quality_dashboard_simple.png
+      - data/validation_outputs/data_quality_summary.md
+
+  data_preprocessing:
+    cmd: python scripts/preprocess_data.py
+    deps:
+      - scripts/preprocess_data.py
+      - data/raw/sample/
+      - data/validation_report.json
+    params:
+      - preprocess.test_size
+      - preprocess.random_state
+      - preprocess.stratify
+    outs:
+      - data/processed/train/
+      - data/processed/validation/
+      - data/processed/test/
+    metrics:
+      - data/preprocessing_metrics.json
+
+  feature_engineering:
+    cmd: python scripts/feature_engineering.py
+    deps:
+      - scripts/feature_engineering.py
+      - data/processed/train/
+      - data/processed/validation/
+      - data/processed/test/
+    params:
+      - features.fingerprint_size
+      - features.radius
+      - features.use_features
+    outs:
+      - data/processed/features/
+    metrics:
+      - data/feature_metrics.json
+
+  model_download:
+    cmd: python scripts/download_pretrained_model.py
+    deps:
+      - scripts/download_pretrained_model.py
+    params:
+      - model.name
+      - model.version
+    outs:
+      - models/pretrained/
+
+  model_evaluation:
+    cmd: python scripts/evaluate_baseline.py
+    deps:
+      - scripts/evaluate_baseline.py
+      - models/pretrained/
+      - data/processed/test/
+      - data/processed/features/
+    outs:
+      - models/baseline_results/
+    metrics:
+      - models/baseline_metrics.json
+
+plots:
+  - data/validation_metrics.json:
+      x: dataset
+      y: quality_score
+      title: "Data Quality by Dataset"
+
+  - data/feature_metrics.json:
+      x: feature_type
+      y: importance
+      title: "Feature Importance"
+
+  - models/baseline_metrics.json:
+      x: metric
+      y: value
+      title: "Baseline Model Performance"

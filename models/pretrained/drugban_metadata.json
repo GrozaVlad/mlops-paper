@@ -1,0 +1,25 @@
+{
+  "model_name": "DrugBAN",
+  "version": "1.0.0",
+  "architecture": "Bilinear Attention Network",
+  "drug_input_dim": 2048,
+  "target_input_dim": 1024,
+  "hidden_dim": 512,
+  "num_heads": 8,
+  "training_data": {
+    "dataset": "BIOSNAP + BindingDB (simulated)",
+    "num_samples": 100000,
+    "num_drugs": 5000,
+    "num_targets": 1500
+  },
+  "performance": {
+    "auc": 0.85,
+    "precision": 0.78,
+    "recall": 0.82,
+    "f1_score": 0.8
+  },
+  "preprocessing": {
+    "drug_features": "Morgan fingerprints (radius=2, nbits=2048)",
+    "target_features": "Protein sequence embeddings"
+  }
+}

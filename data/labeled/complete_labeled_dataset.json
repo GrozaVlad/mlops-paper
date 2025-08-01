@@ -1,0 +1,156 @@
+[
+  {
+    "source": "bindingdb",
+    "drug_id": "bindingdb_drug_0",
+    "target_id": "bindingdb_target_0",
+    "interaction_type": "binding",
+    "binding_affinity": null,
+    "confidence_score": 0.8,
+    "evidence_quality": "high",
+    "annotation_status": "pre_labeled",
+    "drug_metadata": {
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": null,
+      "logp": null
+    },
+    "target_metadata": {
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    }
+  },
+  {
+    "source": "bindingdb",
+    "drug_id": "bindingdb_drug_1",
+    "target_id": "bindingdb_target_1",
+    "interaction_type": "binding",
+    "binding_affinity": null,
+    "confidence_score": 0.8,
+    "evidence_quality": "high",
+    "annotation_status": "pre_labeled",
+    "drug_metadata": {
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": null,
+      "logp": null
+    },
+    "target_metadata": {
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL25",
+    "target_id": "ENSP001",
+    "interaction_type": "inhibitor",
+    "binding_affinity": 7.2,
+    "confidence_score": 0.95,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Aspirin",
+      "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+      "molecular_weight": 180.16,
+      "logp": 1.19
+    },
+    "target_metadata": {
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL85",
+    "target_id": "ENSP003",
+    "interaction_type": "antagonist",
+    "binding_affinity": 5.9,
+    "confidence_score": 0.76,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Caffeine",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07
+    },
+    "target_metadata": {
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL123",
+    "target_id": "ENSP001",
+    "interaction_type": "inhibitor",
+    "binding_affinity": 8.1,
+    "confidence_score": 0.92,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Paracetamol",
+      "smiles": "CC(=O)NC1=CC=C(C=C1)O",
+      "molecular_weight": 151.16,
+      "logp": 0.46
+    },
+    "target_metadata": {
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL456",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.5,
+    "confidence_score": 0.84,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Morphine",
+      "smiles": "CN1CCC23C4C(=O)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O",
+      "molecular_weight": 285.34,
+      "logp": 0.89
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  }
+]

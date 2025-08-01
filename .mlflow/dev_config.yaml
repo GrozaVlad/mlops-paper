@@ -1,0 +1,6 @@
+artifact_root: mlflow_artifacts_dev
+experiment_prefix: dev_
+tags:
+  environment: dev
+  project: drug_repurposing
+tracking_uri: file:///Users/grozavlad/Projects/MLOpsProject/mlruns_dev

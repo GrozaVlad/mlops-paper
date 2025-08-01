@@ -1,0 +1,18 @@
+feature_extractors:
+  morgan_fingerprints:
+    n_bits: 2048
+    radius: 2
+    use_features: true
+  sequence_embeddings:
+    embedding_dim: 1024
+    max_length: 1000
+models:
+  DrugBAN:
+    architecture: bilinear_attention_network
+    input_features:
+      drug: morgan_fingerprints
+      target: sequence_embeddings
+    metadata_path: models/pretrained/drugban_metadata.json
+    output: interaction_probability
+    pretrained_path: models/pretrained/drugban_baseline.pth
+    type: drug_target_interaction

@@ -1,0 +1,449 @@
+name: Scheduled Model Retraining
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: 'Force retraining regardless of conditions'
+        required: false
+        type: boolean
+        default: false
+      trigger_reason:
+        description: 'Manual trigger reason'
+        required: false
+        type: string
+        default: 'Manual trigger'
+
+env:
+  PYTHON_VERSION: '3.10'
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  check-retraining-conditions:
+    name: Check Retraining Conditions
+    runs-on: ubuntu-latest
+    outputs:
+      should_retrain: ${{ steps.check.outputs.should_retrain }}
+      trigger_reasons: ${{ steps.check.outputs.trigger_reasons }}
+      retraining_config: ${{ steps.check.outputs.config }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install mlflow boto3 scikit-learn torch
+        
+    - name: Check retraining conditions
+      id: check
+      run: |
+        # Run retraining condition check
+        if [ "${{ github.event.inputs.force_retrain }}" = "true" ]; then
+          FORCE_FLAG="--force"
+        else
+          FORCE_FLAG=""
+        fi
+        
+        python scripts/retraining/scheduled_retraining.py \
+          --config configs/retraining_config.yaml \
+          --dry-run \
+          $FORCE_FLAG \
+          --output retraining_check.json
+        
+        # Parse results
+        if [ -f "retraining_check.json" ]; then
+          SHOULD_RETRAIN=$(python -c "
+        import json
+        with open('retraining_check.json', 'r') as f:
+            data = json.load(f)
+        print('true' if data.get('should_retrain', False) else 'false')
+        ")
+          
+          TRIGGER_REASONS=$(python -c "
+        import json
+        with open('retraining_check.json', 'r') as f:
+            data = json.load(f)
+        reasons = data.get('trigger_reasons', [])
+        print('|'.join(reasons))
+        ")
+        else
+          SHOULD_RETRAIN="false"
+          TRIGGER_REASONS=""
+        fi
+        
+        # Add manual trigger reason if force retrain
+        if [ "${{ github.event.inputs.force_retrain }}" = "true" ]; then
+          SHOULD_RETRAIN="true"
+          if [ -n "${{ github.event.inputs.trigger_reason }}" ]; then
+            TRIGGER_REASONS="${TRIGGER_REASONS}|${{ github.event.inputs.trigger_reason }}"
+          else
+            TRIGGER_REASONS="${TRIGGER_REASONS}|Manual force retrain"
+          fi
+        fi
+        
+        echo "should_retrain=$SHOULD_RETRAIN" >> $GITHUB_OUTPUT
+        echo "trigger_reasons=$TRIGGER_REASONS" >> $GITHUB_OUTPUT
+        echo "config=configs/retraining_config.yaml" >> $GITHUB_OUTPUT
+        
+        echo "Retraining decision: $SHOULD_RETRAIN"
+        echo "Trigger reasons: $TRIGGER_REASONS"
+        
+    - name: Upload condition check results
+      uses: actions/upload-artifact@v3
+      with:
+        name: retraining-condition-check
+        path: retraining_check.json
+        retention-days: 30
+
+  execute-retraining:
+    name: Execute Model Retraining
+    runs-on: ubuntu-latest
+    needs: check-retraining-conditions
+    if: needs.check-retraining-conditions.outputs.should_retrain == 'true'
+    
+    environment:
+      name: model-training
+      url: ${{ env.MLFLOW_TRACKING_URI }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install mlflow boto3 scikit-learn torch torchvision
+        pip install evidently wandb optuna
+        
+    - name: Download training data
+      run: |
+        # Download latest training data
+        python scripts/download_datasets.py \
+          --version latest \
+          --output-dir data/training
+          
+    - name: Validate training data
+      run: |
+        # Run data validation checks
+        python scripts/validate_data.py \
+          --data-dir data/training \
+          --config configs/data_validation.yaml \
+          --output data_validation_report.json
+          
+    - name: Execute retraining pipeline
+      id: retrain
+      run: |
+        # Parse trigger reasons
+        TRIGGER_REASONS="${{ needs.check-retraining-conditions.outputs.trigger_reasons }}"
+        echo "Trigger reasons: $TRIGGER_REASONS"
+        
+        # Execute retraining
+        python scripts/retraining/scheduled_retraining.py \
+          --config ${{ needs.check-retraining-conditions.outputs.retraining_config }} \
+          --output retraining_results.json
+        
+        # Extract results
+        if [ -f "retraining_results.json" ]; then
+          STATUS=$(python -c "
+        import json
+        with open('retraining_results.json', 'r') as f:
+            data = json.load(f)
+        print(data.get('status', 'UNKNOWN'))
+        ")
+          
+          SHOULD_PROMOTE=$(python -c "
+        import json
+        with open('retraining_results.json', 'r') as f:
+            data = json.load(f)
+        print('true' if data.get('promotion_decision', {}).get('should_promote', False) else 'false')
+        ")
+          
+          MODEL_URI=$(python -c "
+        import json
+        with open('retraining_results.json', 'r') as f:
+            data = json.load(f)
+        print(data.get('model_uri', ''))
+        ")
+          
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          echo "should_promote=$SHOULD_PROMOTE" >> $GITHUB_OUTPUT
+          echo "model_uri=$MODEL_URI" >> $GITHUB_OUTPUT
+        else
+          echo "status=FAILED" >> $GITHUB_OUTPUT
+          echo "should_promote=false" >> $GITHUB_OUTPUT
+          echo "model_uri=" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload retraining results
+      uses: actions/upload-artifact@v3
+      with:
+        name: retraining-results-${{ github.run_id }}
+        path: |
+          retraining_results.json
+          data_validation_report.json
+          logs/
+        retention-days: 90
+        
+    - name: Notify retraining completion
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: custom
+        custom_payload: |
+          {
+            "text": "${{ steps.retrain.outputs.status == 'COMPLETED' && '✅ Model Retraining Completed' || '❌ Model Retraining Failed' }}",
+            "attachments": [
+              {
+                "color": "${{ steps.retrain.outputs.status == 'COMPLETED' && 'good' || 'danger' }}",
+                "fields": [
+                  {
+                    "title": "Status",
+                    "value": "${{ steps.retrain.outputs.status }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Promotion Decision",
+                    "value": "${{ steps.retrain.outputs.should_promote == 'true' && 'PROMOTE' || 'NO PROMOTION' }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Trigger Reasons",
+                    "value": "${{ needs.check-retraining-conditions.outputs.trigger_reasons }}",
+                    "short": false
+                  },
+                  {
+                    "title": "MLflow Run",
+                    "value": "${{ env.MLFLOW_TRACKING_URI }}",
+                    "short": false
+                  }
+                ]
+              }
+            ]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  model-validation:
+    name: Model Validation and Testing
+    runs-on: ubuntu-latest
+    needs: [check-retraining-conditions, execute-retraining]
+    if: needs.execute-retraining.outputs.should_promote == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install mlflow boto3 scikit-learn torch
+        
+    - name: Download retraining results
+      uses: actions/download-artifact@v3
+      with:
+        name: retraining-results-${{ github.run_id }}
+        path: ./
+        
+    - name: Validate new model
+      id: validate
+      run: |
+        # Run comprehensive model validation
+        python scripts/validate_model.py \
+          --model-uri "${{ needs.execute-retraining.outputs.model_uri }}" \
+          --test-data data/test/ \
+          --validation-config configs/model_validation.yaml \
+          --output model_validation_report.json
+        
+        # Check validation results
+        VALIDATION_PASSED=$(python -c "
+        import json
+        try:
+            with open('model_validation_report.json', 'r') as f:
+                data = json.load(f)
+            print('true' if data.get('validation_passed', False) else 'false')
+        except:
+            print('false')
+        ")
+        
+        echo "validation_passed=$VALIDATION_PASSED" >> $GITHUB_OUTPUT
+        
+    - name: Run A/B testing preparation
+      if: steps.validate.outputs.validation_passed == 'true'
+      run: |
+        # Prepare A/B testing configuration
+        python scripts/ab_testing/prepare_ab_test.py \
+          --challenger-model "${{ needs.execute-retraining.outputs.model_uri }}" \
+          --champion-model "models:/DrugBAN/Production" \
+          --traffic-split 0.1 \
+          --duration-hours 24 \
+          --output ab_test_config.json
+          
+    - name: Upload validation results
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-validation-${{ github.run_id }}
+        path: |
+          model_validation_report.json
+          ab_test_config.json
+        retention-days: 90
+
+  promote-to-staging:
+    name: Promote Model to Staging
+    runs-on: ubuntu-latest
+    needs: [execute-retraining, model-validation]
+    if: needs.model-validation.outputs.validation_passed == 'true'
+    
+    environment:
+      name: model-staging
+      url: https://drugban-staging.example.com
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install MLflow
+      run: |
+        pip install mlflow boto3
+        
+    - name: Promote model to staging
+      run: |
+        # Promote model to staging environment
+        python -c "
+        import mlflow
+        
+        client = mlflow.tracking.MlflowClient()
+        model_uri = '${{ needs.execute-retraining.outputs.model_uri }}'
+        
+        # Extract version from URI
+        model_name = 'DrugBAN'
+        
+        # Get model version
+        model_version = client.get_model_version_by_alias(model_name, 'challenger')
+        
+        # Transition to staging
+        client.transition_model_version_stage(
+            name=model_name,
+            version=model_version.version,
+            stage='Staging',
+            archive_existing_versions=False
+        )
+        
+        print(f'Model version {model_version.version} promoted to Staging')
+        "
+        
+    - name: Deploy to staging environment
+      run: |
+        # Deploy model to staging Kubernetes environment
+        kubectl config use-context staging
+        
+        # Update deployment with new model version
+        MODEL_VERSION=$(python -c "
+        import mlflow
+        client = mlflow.tracking.MlflowClient()
+        staging_models = client.get_latest_versions('DrugBAN', stages=['Staging'])
+        print(staging_models[0].version if staging_models else 'latest')
+        ")
+        
+        # Update Kubernetes deployment
+        kubectl set image deployment/drugban-api \
+          drugban-api=drugban-api:model-v$MODEL_VERSION \
+          -n drugban-staging
+        
+        # Wait for rollout
+        kubectl rollout status deployment/drugban-api -n drugban-staging --timeout=300s
+        
+    - name: Run staging validation tests
+      run: |
+        # Run API tests against staging
+        python tests/staging/test_api_endpoints.py \
+          --base-url https://drugban-staging.example.com \
+          --output staging_test_results.json
+          
+    - name: Notify staging deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        channel: '#drugban-staging'
+        text: |
+          🎯 New model deployed to staging environment
+          
+          **Model Version:** Staging
+          **Validation:** Passed
+          **Staging URL:** https://drugban-staging.example.com
+          
+          Ready for A/B testing and final validation.
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  retraining-summary:
+    name: Retraining Summary Report
+    runs-on: ubuntu-latest
+    needs: [check-retraining-conditions, execute-retraining, model-validation, promote-to-staging]
+    if: always()
+    
+    steps:
+    - name: Generate retraining summary
+      run: |
+        cat << EOF > retraining_summary.md
+        # Model Retraining Summary
+        
+        **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Workflow:** ${{ github.workflow }}
+        **Run ID:** ${{ github.run_id }}
+        
+        ## Trigger Information
+        - **Should Retrain:** ${{ needs.check-retraining-conditions.outputs.should_retrain }}
+        - **Trigger Reasons:** ${{ needs.check-retraining-conditions.outputs.trigger_reasons }}
+        - **Triggered By:** ${{ github.event_name }}
+        
+        ## Retraining Results
+        - **Status:** ${{ needs.execute-retraining.outputs.status }}
+        - **Promotion Decision:** ${{ needs.execute-retraining.outputs.should_promote }}
+        - **Model URI:** ${{ needs.execute-retraining.outputs.model_uri }}
+        
+        ## Validation Results
+        - **Validation Passed:** ${{ needs.model-validation.outputs.validation_passed }}
+        - **Promoted to Staging:** ${{ needs.promote-to-staging.result == 'success' }}
+        
+        ## Next Steps
+        ${{ needs.execute-retraining.outputs.should_promote == 'true' && '- Monitor staging performance\n- Prepare for A/B testing\n- Schedule production promotion review' || '- Review retraining logs\n- Address performance issues\n- Consider manual intervention' }}
+        
+        EOF
+        
+        cat retraining_summary.md
+        
+    - name: Upload summary report
+      uses: actions/upload-artifact@v3
+      with:
+        name: retraining-summary-${{ github.run_id }}
+        path: retraining_summary.md
+        retention-days: 365

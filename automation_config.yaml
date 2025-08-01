@@ -1,0 +1,45 @@
+automation_settings:
+  auto_quality_checks: true
+  enable_scheduled_execution: false
+  max_retries: 2
+  notification_email: null
+  retry_failed_steps: true
+  schedule_frequency: daily
+  schedule_time: 02:00
+monitoring:
+  alert_on_failure: true
+  dashboard_auto_refresh: true
+  log_retention_days: 30
+  track_execution_time: true
+pipeline_steps:
+  apply_data_augmentation:
+    depends_on:
+    - generate_molecular_fingerprints
+    enabled: true
+    timeout_minutes: 10
+  data_quality_dashboard:
+    depends_on:
+    - apply_data_augmentation
+    enabled: true
+    timeout_minutes: 5
+  data_validation:
+    depends_on: []
+    enabled: true
+    timeout_minutes: 10
+  generate_molecular_fingerprints:
+    depends_on:
+    - import_labeled_datasets
+    enabled: true
+    timeout_minutes: 15
+  import_labeled_datasets:
+    depends_on:
+    - data_validation
+    enabled: true
+    timeout_minutes: 5
+quality_thresholds:
+  data_readiness_level:
+  - STAGING_READY
+  - PRODUCTION_READY
+  datasets_passed: 3
+  overall_quality_score: 80
+  validation_success_rate: 0.9

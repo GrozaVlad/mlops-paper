@@ -1,0 +1,6 @@
+artifact_root: mlflow_artifacts_staging
+experiment_prefix: staging_
+tags:
+  environment: staging
+  project: drug_repurposing
+tracking_uri: file:///Users/grozavlad/Projects/MLOpsProject/mlruns_staging

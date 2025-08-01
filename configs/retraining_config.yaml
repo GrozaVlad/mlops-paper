@@ -1,0 +1,225 @@
+# Automated Model Retraining Configuration
+# Configuration for the scheduled retraining pipeline
+
+# Retraining schedule configuration
+retraining_schedule:
+  frequency: "weekly"        # Options: daily, weekly, monthly
+  day_of_week: 0            # 0=Monday, 1=Tuesday, ..., 6=Sunday
+  hour: 2                   # Hour in UTC (24-hour format)
+  max_training_time_hours: 6 # Maximum time allowed for training
+
+# Conditions that trigger retraining
+trigger_conditions:
+  performance_degradation_threshold: 0.05  # 5% drop in accuracy
+  data_drift_threshold: 0.3                # Statistical drift threshold
+  concept_drift_threshold: 0.2             # Concept drift threshold
+  min_new_data_samples: 1000               # Minimum new samples required
+  force_retrain_days: 30                   # Force retrain after N days
+
+# Training configuration
+training_config:
+  experiment_name: "automated_retraining"
+  model_name: "DrugBAN"
+  training_epochs: 100
+  early_stopping_patience: 15
+  validation_split: 0.2
+  batch_size: 64
+  learning_rate: 0.0005
+  optimizer: "adam"
+  loss_function: "binary_crossentropy"
+  
+  # Model architecture parameters
+  model_params:
+    hidden_dim: 256
+    num_layers: 3
+    dropout_rate: 0.3
+    activation: "relu"
+  
+  # Data augmentation settings
+  data_augmentation:
+    enable: true
+    augmentation_ratio: 2.0
+    noise_level: 0.01
+    feature_dropout_rate: 0.1
+
+# Model evaluation criteria
+evaluation_criteria:
+  min_accuracy: 0.75               # Minimum acceptable accuracy
+  min_auc: 0.80                   # Minimum acceptable AUC
+  min_precision: 0.70             # Minimum acceptable precision
+  min_recall: 0.70                # Minimum acceptable recall
+  max_performance_drop: 0.02      # Max 2% worse than baseline
+  statistical_significance_alpha: 0.05  # P-value threshold
+
+# Model promotion rules
+promotion_rules:
+  auto_promote_threshold: 0.05         # 5% improvement for auto-promotion
+  require_manual_approval: true       # Require manual approval for promotion
+  staging_duration_hours: 24          # Time model stays in staging
+  rollback_on_production_issues: true # Auto-rollback on production issues
+  
+  # Promotion criteria weights
+  criteria_weights:
+    accuracy: 0.3
+    auc: 0.3
+    precision: 0.2
+    recall: 0.2
+
+# Data sources and paths
+data_config:
+  training_data_path: "data/training/"
+  validation_data_path: "data/validation/"
+  test_data_path: "data/test/"
+  reference_data_path: "data/reference/"
+  
+  # Data quality thresholds
+  data_quality:
+    min_completeness: 0.95    # 95% non-null values
+    max_outliers_pct: 0.05    # Max 5% outliers
+    min_samples_per_class: 100 # Min samples per class
+
+# Drift detection configuration
+drift_detection:
+  statistical_tests:
+    - "kolmogorov_smirnov"
+    - "mann_whitney_u"
+    - "chi_square"
+  
+  feature_importance_threshold: 0.1  # Only monitor important features
+  rolling_window_size: 1000         # Samples for rolling comparison
+  
+  # Evidently AI configuration
+  evidently_config:
+    reference_window_size: 5000
+    current_window_size: 1000
+    drift_threshold: 0.3
+
+# Monitoring and alerting
+monitoring:
+  enable_alerts: true
+  alert_channels:
+    - "slack"
+    - "email"
+  
+  # Performance monitoring thresholds
+  performance_alerts:
+    accuracy_drop_threshold: 0.03    # 3% drop triggers alert
+    latency_increase_threshold: 0.5  # 50% latency increase
+    error_rate_threshold: 0.05       # 5% error rate
+  
+  # Slack configuration
+  slack_config:
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#drugban-retraining"
+    username: "DrugBAN Retraining Bot"
+
+# MLflow configuration
+mlflow_config:
+  tracking_uri: "${MLFLOW_TRACKING_URI}"
+  experiment_name: "automated_retraining"
+  artifact_root: "s3://drugban-mlflow-artifacts/retraining/"
+  
+  # Model registry settings
+  registry_config:
+    model_name: "DrugBAN"
+    staging_alias: "challenger"
+    production_alias: "champion"
+    archive_old_versions: true
+    max_versions_to_keep: 10
+
+# Infrastructure configuration
+infrastructure:
+  # Computing resources
+  compute_config:
+    training_instance_type: "ml.p3.2xlarge"  # AWS SageMaker instance
+    training_volume_size: 100                # GB
+    max_runtime_seconds: 21600               # 6 hours
+  
+  # Kubernetes job configuration (if using K8s)
+  kubernetes_config:
+    namespace: "drugban-training"
+    cpu_request: "2"
+    cpu_limit: "4"
+    memory_request: "8Gi"
+    memory_limit: "16Gi"
+    gpu_request: "1"
+    storage_size: "50Gi"
+
+# Backup and recovery
+backup_config:
+  enable_model_backup: true
+  backup_retention_days: 90
+  backup_location: "s3://drugban-model-backups/"
+  
+  # Rollback configuration
+  rollback_config:
+    enable_auto_rollback: true
+    health_check_timeout: 300    # 5 minutes
+    performance_check_duration: 1800  # 30 minutes
+    rollback_triggers:
+      - "error_rate_spike"
+      - "latency_spike"
+      - "accuracy_drop"
+
+# Security and compliance
+security:
+  # Model validation
+  model_validation:
+    enable_adversarial_testing: true
+    enable_fairness_testing: true
+    enable_explainability_check: true
+  
+  # Data privacy
+  data_privacy:
+    enable_differential_privacy: false
+    privacy_budget: 1.0
+    noise_multiplier: 1.1
+  
+  # Audit trail
+  audit_config:
+    enable_audit_logging: true
+    audit_retention_days: 2555  # 7 years for compliance
+    audit_storage: "s3://drugban-audit-logs/"
+
+# Notification templates
+notifications:
+  retraining_started:
+    title: "🔄 Model Retraining Started"
+    message: |
+      Automated retraining has been triggered for DrugBAN model.
+      
+      **Trigger Reasons:**
+      {trigger_reasons}
+      
+      **Expected Duration:** {max_training_time_hours} hours
+      **Started:** {start_time}
+  
+  retraining_completed:
+    title: "✅ Model Retraining Completed"
+    message: |
+      Model retraining has completed successfully.
+      
+      **Results:**
+      - Accuracy: {accuracy:.3f}
+      - AUC: {auc:.3f}
+      - Improvement: {improvement:.3f}
+      
+      **Promotion Decision:** {promotion_decision}
+  
+  retraining_failed:
+    title: "❌ Model Retraining Failed"
+    message: |
+      Model retraining has failed.
+      
+      **Error:** {error_message}
+      **Duration:** {duration}
+      **Action Required:** Manual investigation needed
+  
+  promotion_approved:
+    title: "🚀 Model Promoted to Production"
+    message: |
+      New model version has been promoted to production.
+      
+      **Model Version:** {model_version}
+      **Performance:** Accuracy {accuracy:.3f}, AUC {auc:.3f}
+      **Promoted:** {promotion_time}

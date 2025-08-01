@@ -1,0 +1,14 @@
+artifact_uri: /Users/grozavlad/Projects/MLOpsProject/mlflow_artifacts/drug_repurposing_baseline/4abac464febc4e9db931da01f00c3f0b/artifacts
+end_time: 1753538439061
+entry_point_name: ''
+experiment_id: '897862512375808083'
+lifecycle_stage: active
+run_id: 4abac464febc4e9db931da01f00c3f0b
+run_name: DrugBAN_baseline_setup
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753538437632
+status: 3
+tags: []
+user_id: grozavlad

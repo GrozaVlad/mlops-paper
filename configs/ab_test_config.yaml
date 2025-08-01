@@ -1,0 +1,352 @@
+# A/B Testing Framework Configuration
+# Configuration for model comparison experiments
+
+# Basic experiment configuration
+experiment_config:
+  default_duration_hours: 72        # 3 days default
+  min_sample_size: 1000            # Minimum samples per variant
+  statistical_power: 0.8           # 80% statistical power
+  significance_level: 0.05         # 5% significance level
+  effect_size: 0.02               # 2% minimum detectable effect
+  confidence_interval: 0.95       # 95% confidence interval
+
+# Traffic allocation settings
+traffic_allocation:
+  default_split:
+    champion: 0.9                  # 90% to champion
+    challenger: 0.1                # 10% to challenger
+  
+  ramp_up_strategy: "gradual"      # Options: gradual, immediate
+  max_challenger_traffic: 0.5      # Maximum 50% to challenger
+  ramp_up_duration_hours: 24       # 24 hours to reach full allocation
+  
+  # Gradual ramp-up schedule
+  ramp_schedule:
+    - hour: 0
+      challenger_pct: 5
+    - hour: 6
+      challenger_pct: 7
+    - hour: 12
+      challenger_pct: 10
+    - hour: 24
+      challenger_pct: 15
+
+# Metrics tracking configuration
+metrics_tracking:
+  # Primary model performance metrics
+  primary_metrics:
+    - "accuracy"
+    - "auc"
+    - "precision"
+    - "recall"
+    - "f1_score"
+  
+  # Secondary operational metrics
+  secondary_metrics:
+    - "prediction_latency"
+    - "throughput_rps"
+    - "error_rate"
+    - "memory_usage"
+    - "cpu_utilization"
+  
+  # Business impact metrics
+  business_metrics:
+    - "user_satisfaction"
+    - "prediction_confidence"
+    - "model_reliability"
+    - "conversion_rate"
+  
+  # Collection settings
+  collection_interval_seconds: 60
+  aggregation_window_minutes: 5
+  retention_days: 90
+
+# Guardrail metrics and thresholds
+guardrail_metrics:
+  max_error_rate: 0.05             # 5% maximum error rate
+  max_latency_increase: 0.2        # 20% maximum latency increase
+  min_accuracy: 0.75               # 75% minimum accuracy
+  max_memory_increase: 0.3         # 30% maximum memory increase
+  max_cpu_increase: 0.5            # 50% maximum CPU increase
+  
+  # Violation handling
+  violation_response:
+    alert_threshold: 1             # Alert after 1 violation
+    traffic_reduction_threshold: 2  # Reduce traffic after 2 violations
+    stop_threshold: 3              # Stop experiment after 3 violations
+
+# Early stopping configuration
+early_stopping:
+  enable: true
+  check_interval_hours: 6          # Check every 6 hours
+  min_runtime_hours: 12            # Minimum 12 hours before stopping
+  
+  # Conditions for early stopping
+  stop_conditions:
+    significance_achieved: true     # Stop if significance achieved
+    guardrail_violation: true      # Stop if guardrails violated
+    sample_size_reached: true      # Stop if sufficient samples
+    business_impact_negative: true # Stop if negative business impact
+  
+  # Statistical significance thresholds
+  significance_thresholds:
+    primary_metrics: 0.01          # 1% significance for primary metrics
+    secondary_metrics: 0.05        # 5% significance for secondary metrics
+
+# Statistical analysis configuration
+statistical_analysis:
+  methods:
+    - "t_test"                     # Student's t-test
+    - "mann_whitney_u"             # Non-parametric alternative
+    - "bootstrap"                  # Bootstrap confidence intervals
+    - "bayesian"                   # Bayesian A/B testing
+  
+  # Multiple testing correction
+  multiple_testing_correction: "bonferroni"  # Options: bonferroni, fdr, none
+  
+  # Bootstrap settings
+  bootstrap_config:
+    n_iterations: 10000
+    confidence_level: 0.95
+    random_seed: 42
+  
+  # Bayesian settings
+  bayesian_config:
+    prior_alpha: 1                 # Beta distribution alpha
+    prior_beta: 1                  # Beta distribution beta
+    credible_interval: 0.95        # 95% credible interval
+
+# Model deployment configuration
+deployment_config:
+  # Kubernetes deployment settings
+  kubernetes:
+    namespace: "drugban-ab-test"
+    champion_deployment: "drugban-champion"
+    challenger_deployment: "drugban-challenger"
+    
+    # Resource allocation
+    resources:
+      champion:
+        cpu_request: "1"
+        cpu_limit: "2"
+        memory_request: "2Gi"
+        memory_limit: "4Gi"
+      challenger:
+        cpu_request: "1"
+        cpu_limit: "2"
+        memory_request: "2Gi"
+        memory_limit: "4Gi"
+    
+    # Health checks
+    health_checks:
+      liveness_probe:
+        initial_delay_seconds: 30
+        period_seconds: 10
+        timeout_seconds: 5
+        failure_threshold: 3
+      readiness_probe:
+        initial_delay_seconds: 5
+        period_seconds: 5
+        timeout_seconds: 3
+        failure_threshold: 3
+  
+  # Load balancer configuration
+  load_balancer:
+    algorithm: "hash_based"         # Options: hash_based, weighted_round_robin
+    session_affinity: "ClientIP"   # Sticky sessions
+    timeout_seconds: 30
+    retry_attempts: 2
+
+# Model serving configuration
+model_serving:
+  # API endpoints
+  endpoints:
+    champion: "http://champion-service:8000"
+    challenger: "http://challenger-service:8000"
+    health_check: "/health"
+    predict: "/predict"
+    metrics: "/metrics"
+  
+  # Request routing
+  routing:
+    header_name: "X-Model-Variant"  # Header for variant assignment
+    user_id_header: "X-User-ID"     # Header for user ID (for sticky sessions)
+    experiment_header: "X-Experiment-ID"  # Header for experiment tracking
+  
+  # Request/response handling
+  request_config:
+    timeout_seconds: 30
+    max_retries: 2
+    retry_backoff_seconds: 1
+    max_request_size_mb: 10
+
+# Redis configuration for experiment state
+redis_config:
+  host: "${REDIS_HOST:-localhost}"
+  port: 6379
+  db: 0
+  password: "${REDIS_PASSWORD:-}"
+  key_prefix: "ab_test:"
+  ttl_seconds: 604800              # 7 days TTL
+
+# Monitoring and alerting
+monitoring:
+  # Prometheus metrics
+  prometheus:
+    metrics_endpoint: "/metrics"
+    scrape_interval: "15s"
+    
+    # Custom metrics
+    custom_metrics:
+      - name: "ab_test_prediction_total"
+        type: "counter"
+        help: "Total predictions by variant"
+        labels: ["experiment_id", "variant", "outcome"]
+      
+      - name: "ab_test_prediction_duration"
+        type: "histogram"
+        help: "Prediction duration by variant"
+        labels: ["experiment_id", "variant"]
+        buckets: [0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
+      
+      - name: "ab_test_model_accuracy"
+        type: "gauge"
+        help: "Model accuracy by variant"
+        labels: ["experiment_id", "variant"]
+  
+  # Grafana dashboards
+  grafana:
+    dashboard_template: "ab_test_dashboard.json"
+    auto_create_dashboard: true
+    
+    # Dashboard panels
+    panels:
+      - "traffic_distribution"
+      - "conversion_rates"
+      - "statistical_significance"
+      - "performance_metrics"
+      - "guardrail_violations"
+      - "business_impact"
+  
+  # Alerting configuration
+  alerting:
+    channels:
+      - "slack"
+      - "email"
+      - "pagerduty"
+    
+    # Alert rules
+    rules:
+      - name: "high_error_rate"
+        condition: "error_rate > 0.05"
+        severity: "critical"
+        channels: ["slack", "pagerduty"]
+      
+      - name: "performance_degradation"
+        condition: "accuracy_drop > 0.05"
+        severity: "warning"
+        channels: ["slack", "email"]
+      
+      - name: "guardrail_violation"
+        condition: "guardrail_violations > 0"
+        severity: "warning"
+        channels: ["slack"]
+
+# Notification configuration
+notifications:
+  slack:
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#drugban-ab-testing"
+    username: "AB Test Bot"
+    
+    # Message templates
+    templates:
+      experiment_started: |
+        🧪 **A/B Test Started**
+        
+        **Experiment:** {experiment_name}
+        **Duration:** {duration_hours} hours
+        **Traffic Split:** {champion_pct}% Champion / {challenger_pct}% Challenger
+        
+        **Models:**
+        - Champion: {champion_model}
+        - Challenger: {challenger_model}
+      
+      experiment_completed: |
+        ✅ **A/B Test Completed**
+        
+        **Experiment:** {experiment_name}
+        **Result:** {recommendation}
+        **Confidence:** {confidence_level}%
+        
+        **Key Metrics:**
+        - Accuracy: {accuracy_improvement}
+        - Significance: {p_value}
+      
+      guardrail_violation: |
+        ⚠️ **Guardrail Violation Detected**
+        
+        **Experiment:** {experiment_name}
+        **Metric:** {violated_metric}
+        **Value:** {metric_value}
+        **Threshold:** {threshold}
+        
+        **Action:** {response_action}
+
+# Experiment templates
+experiment_templates:
+  # Standard model comparison
+  model_comparison:
+    duration_hours: 72
+    traffic_split: 0.1
+    primary_metrics: ["accuracy", "auc"]
+    early_stopping: true
+  
+  # Performance optimization test
+  performance_test:
+    duration_hours: 24
+    traffic_split: 0.2
+    primary_metrics: ["latency", "throughput"]
+    guardrails:
+      max_latency_increase: 0.1    # 10% max increase
+  
+  # Full evaluation test
+  full_evaluation:
+    duration_hours: 168            # 1 week
+    traffic_split: 0.3
+    primary_metrics: ["accuracy", "auc", "precision", "recall"]
+    business_metrics: ["user_satisfaction", "conversion_rate"]
+    early_stopping: false
+
+# Data retention and compliance
+data_retention:
+  experiment_data_days: 365        # 1 year
+  metrics_data_days: 90           # 3 months
+  logs_data_days: 30              # 1 month
+  
+  # Export settings
+  export_config:
+    format: "json"                 # Options: json, csv, parquet
+    compression: "gzip"
+    include_raw_data: true
+    include_aggregated_data: true
+
+# Security and access control
+security:
+  # API authentication
+  api_auth:
+    enabled: true
+    method: "jwt"                  # Options: jwt, api_key, oauth
+    token_expiry_hours: 24
+  
+  # Access control
+  access_control:
+    admin_users: ["admin", "ml-ops-team"]
+    readonly_users: ["data-science-team"]
+    experiment_creators: ["ml-ops-team", "senior-data-scientists"]
+  
+  # Data privacy
+  privacy:
+    anonymize_user_data: true
+    encrypt_stored_data: true
+    audit_access: true

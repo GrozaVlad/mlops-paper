@@ -1,0 +1,255 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: drugban-ingress
+  namespace: drugban
+  labels:
+    app: drugban-api
+  annotations:
+    # NGINX Ingress Controller annotations
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-rpm: "600"
+    nginx.ingress.kubernetes.io/rate-limit-burst-multiplier: "5"
+    
+    # SSL/TLS configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options DENY always;
+      add_header X-Content-Type-Options nosniff always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # CORS configuration
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type"
+    
+    # Load balancing
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/load-balance: "ewma"
+    
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # Body size
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # Custom error pages
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,500,502,503,504"
+    nginx.ingress.kubernetes.io/default-backend: "drugban-error-pages"
+
+spec:
+  tls:
+  - hosts:
+    - drugban-api.yourdomain.com
+    secretName: drugban-tls-secret
+  
+  rules:
+  - host: drugban-api.yourdomain.com
+    http:
+      paths:
+      
+      # Health check endpoint (no auth required)
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+      
+      # Authentication endpoints
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+      
+      # API documentation
+      - path: /(docs|redoc|openapi.json)
+        pathType: Prefix
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+      
+      # Prediction endpoints
+      - path: /predict
+        pathType: Prefix
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+      
+      # Model information
+      - path: /model
+        pathType: Prefix
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+      
+      # Default route
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: drugban-api-internal
+            port:
+              number: 8000
+
+---
+# Separate ingress for metrics (internal access only)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: drugban-metrics-ingress
+  namespace: drugban
+  labels:
+    app: drugban-api
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: metrics-auth
+    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - Metrics'
+spec:
+  rules:
+  - host: drugban-metrics.internal
+    http:
+      paths:
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: drugban-metrics
+            port:
+              number: 8000
+
+---
+# Error pages service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: drugban-error-pages
+  namespace: drugban
+  labels:
+    app: drugban-error-pages
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: drugban-error-pages
+  template:
+    metadata:
+      labels:
+        app: drugban-error-pages
+    spec:
+      containers:
+      - name: error-pages
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: error-pages-config
+          mountPath: /etc/nginx/conf.d
+        - name: error-pages-html
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: error-pages-config
+        configMap:
+          name: error-pages-config
+      - name: error-pages-html
+        configMap:
+          name: error-pages-html
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: drugban-error-pages
+  namespace: drugban
+  labels:
+    app: drugban-error-pages
+spec:
+  selector:
+    app: drugban-error-pages
+  ports:
+  - port: 80
+    targetPort: 80
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages-config
+  namespace: drugban
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri.html =404;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages-html
+  namespace: drugban
+data:
+  404.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>404 - Not Found</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #e74c3c; }
+        </style>
+    </head>
+    <body>
+        <h1>404 - Not Found</h1>
+        <p>The requested endpoint was not found.</p>
+        <p>Please check the <a href="/docs">API documentation</a> for available endpoints.</p>
+    </body>
+    </html>
+  
+  500.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>500 - Internal Server Error</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            h1 { color: #e74c3c; }
+        </style>
+    </head>
+    <body>
+        <h1>500 - Internal Server Error</h1>
+        <p>Something went wrong on our end. Please try again later.</p>
+    </body>
+    </html>

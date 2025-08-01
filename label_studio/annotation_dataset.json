@@ -1,0 +1,112 @@
+[
+  {
+    "id": 1,
+    "data": {
+      "drug_id": "CHEMBL25",
+      "drug_name": "Aspirin",
+      "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+      "molecular_weight": 180.16,
+      "logp": 1.19,
+      "target_id": "ENSP001",
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme",
+      "existing_interaction_type": "inhibitor",
+      "existing_binding_affinity": 7.2,
+      "existing_confidence": 0.95
+    },
+    "meta": {
+      "original_source": "sample_data",
+      "preparation_date": "2025-07-26T17:37:48.999384"
+    }
+  },
+  {
+    "id": 2,
+    "data": {
+      "drug_id": "CHEMBL53",
+      "drug_name": "Ibuprofen",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97,
+      "target_id": "ENSP002",
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme",
+      "existing_interaction_type": "agonist",
+      "existing_binding_affinity": 6.8,
+      "existing_confidence": 0.87
+    },
+    "meta": {
+      "original_source": "sample_data",
+      "preparation_date": "2025-07-26T17:37:48.999417"
+    }
+  },
+  {
+    "id": 3,
+    "data": {
+      "drug_id": "CHEMBL85",
+      "drug_name": "Caffeine",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07,
+      "target_id": "ENSP003",
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR",
+      "existing_interaction_type": "antagonist",
+      "existing_binding_affinity": 5.9,
+      "existing_confidence": 0.76
+    },
+    "meta": {
+      "original_source": "sample_data",
+      "preparation_date": "2025-07-26T17:37:48.999449"
+    }
+  },
+  {
+    "id": 4,
+    "data": {
+      "drug_id": "CHEMBL123",
+      "drug_name": "Paracetamol",
+      "smiles": "CC(=O)NC1=CC=C(C=C1)O",
+      "molecular_weight": 151.16,
+      "logp": 0.46,
+      "target_id": "ENSP001",
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme",
+      "existing_interaction_type": "inhibitor",
+      "existing_binding_affinity": 8.1,
+      "existing_confidence": 0.92
+    },
+    "meta": {
+      "original_source": "sample_data",
+      "preparation_date": "2025-07-26T17:37:48.999477"
+    }
+  },
+  {
+    "id": 5,
+    "data": {
+      "drug_id": "CHEMBL456",
+      "drug_name": "Morphine",
+      "smiles": "CN1CCC23C4C(=O)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O",
+      "molecular_weight": 285.34,
+      "logp": 0.89,
+      "target_id": "ENSP002",
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme",
+      "existing_interaction_type": "agonist",
+      "existing_binding_affinity": 6.5,
+      "existing_confidence": 0.84
+    },
+    "meta": {
+      "original_source": "sample_data",
+      "preparation_date": "2025-07-26T17:37:48.999504"
+    }
+  }
+]

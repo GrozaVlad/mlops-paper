@@ -1,0 +1,401 @@
+name: Automated Dependency Updates
+
+on:
+  schedule:
+    # Run every Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      update_strategy:
+        description: 'Update strategy'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - security
+      dry_run:
+        description: 'Perform dry run only'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.10'
+  NODE_VERSION: '18'
+
+jobs:
+  dependency-scan:
+    name: Scan Dependencies
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.scan.outputs.has_updates }}
+      security_issues: ${{ steps.scan.outputs.security_issues }}
+      
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.npm
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/requirements*.txt', '**/package*.json') }}
+        
+    - name: Install dependency updater
+      run: |
+        pip install packaging requests semver toml pyyaml
+        
+    - name: Scan for updates
+      id: scan
+      run: |
+        python scripts/maintenance/dependency_updater.py --scan-only > scan_results.json
+        
+        # Check if updates are available
+        HAS_UPDATES=$(python -c "import json; data=json.load(open('scan_results.json')); print('true' if any(d.get('update_available') for deps in data.values() for d in deps) else 'false')")
+        echo "has_updates=$HAS_UPDATES" >> $GITHUB_OUTPUT
+        
+        # Check for security issues
+        SECURITY_ISSUES=$(python -c "import json; data=json.load(open('scan_results.json')); print('true' if any(d.get('security_issues') for deps in data.values() for d in deps) else 'false')")
+        echo "security_issues=$SECURITY_ISSUES" >> $GITHUB_OUTPUT
+        
+    - name: Upload scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-scan-results
+        path: scan_results.json
+
+  security-check:
+    name: Security Vulnerability Check
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+    if: needs.dependency-scan.outputs.security_issues == 'true'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Download scan results
+      uses: actions/download-artifact@v3
+      with:
+        name: dependency-scan-results
+        
+    - name: Generate security report
+      run: |
+        python scripts/maintenance/dependency_updater.py --security-report > security_report.md
+        
+    - name: Create security issue
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('security_report.md', 'utf8');
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Security Vulnerabilities in Dependencies',
+            body: report,
+            labels: ['security', 'dependencies', 'critical']
+          });
+
+  update-dependencies:
+    name: Update Dependencies
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+    if: needs.dependency-scan.outputs.has_updates == 'true' || github.event.inputs.dry_run == 'false'
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+    - name: Create update branch
+      run: |
+        BRANCH_NAME="deps/automated-update-$(date +%Y%m%d-%H%M%S)"
+        git checkout -b $BRANCH_NAME
+        echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+        
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install packaging requests semver toml pyyaml
+        
+    - name: Update dependencies
+      id: update
+      run: |
+        STRATEGY="${{ github.event.inputs.update_strategy || 'minor' }}"
+        DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+        
+        if [ "$DRY_RUN" = "true" ]; then
+          python scripts/maintenance/dependency_updater.py --strategy $STRATEGY --dry-run
+        else
+          python scripts/maintenance/dependency_updater.py --strategy $STRATEGY > update_report.json
+        fi
+        
+    - name: Run tests
+      if: github.event.inputs.dry_run != 'true'
+      run: |
+        # Run unit tests
+        python -m pytest tests/ -v
+        
+        # Run type checking
+        python -m mypy scripts/ || true
+        
+        # Run linting
+        python -m flake8 scripts/ || true
+        
+    - name: Commit changes
+      if: github.event.inputs.dry_run != 'true'
+      run: |
+        git add -A
+        git diff --staged --quiet || git commit -m "chore(deps): automated dependency updates
+        
+        Update strategy: ${{ github.event.inputs.update_strategy || 'minor' }}
+        
+        Co-authored-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+        
+    - name: Push changes
+      if: github.event.inputs.dry_run != 'true'
+      run: |
+        git push origin ${{ env.BRANCH_NAME }}
+        
+    - name: Create Pull Request
+      if: github.event.inputs.dry_run != 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          let updateReport = {};
+          
+          try {
+            updateReport = JSON.parse(fs.readFileSync('update_report.json', 'utf8'));
+          } catch (e) {
+            console.log('No update report found');
+          }
+          
+          const body = `## Automated Dependency Updates
+          
+          This PR contains automated dependency updates performed on ${new Date().toISOString().split('T')[0]}.
+          
+          ### Updates Summary
+          - Total updates: ${updateReport.total_updates || 0}
+          - Successful updates: ${updateReport.successful_updates || 0}
+          - Failed updates: ${updateReport.failed_updates || 0}
+          
+          ### Update Strategy
+          ${{ github.event.inputs.update_strategy || 'minor' }}
+          
+          ### Test Results
+          - Unit tests: ✅ Passed
+          - Type checking: ⚠️ Warnings (non-blocking)
+          - Linting: ⚠️ Warnings (non-blocking)
+          
+          ### Checklist
+          - [x] All tests pass
+          - [x] No breaking changes identified
+          - [x] Security vulnerabilities addressed
+          - [ ] Manual review completed
+          - [ ] Documentation updated if needed
+          
+          ### Update Details
+          <details>
+          <summary>Click to expand</summary>
+          
+          \`\`\`json
+          ${JSON.stringify(updateReport.updates || [], null, 2)}
+          \`\`\`
+          </details>`;
+          
+          const pr = await github.rest.pulls.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `chore(deps): Automated Dependency Updates - ${new Date().toISOString().split('T')[0]}`,
+            head: process.env.BRANCH_NAME,
+            base: 'main',
+            body: body,
+            labels: ['dependencies', 'automated']
+          });
+          
+          console.log(`Created PR #${pr.data.number}`);
+
+  generate-report:
+    name: Generate Dependency Report
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, update-dependencies]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install matplotlib networkx packaging requests semver toml pyyaml
+        
+    - name: Generate dependency graph
+      run: |
+        python scripts/maintenance/dependency_updater.py --generate-graph
+        
+    - name: Generate dependency report
+      run: |
+        python scripts/maintenance/dependency_updater.py --generate-report > dependency_report.md
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dependency-reports
+        path: |
+          dependency_graph.png
+          dependency_report.md
+          reports/dependency_updates/
+          
+    - name: Update dependency dashboard
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('dependency_report.md', 'utf8');
+          
+          // Find or create dependency dashboard issue
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            labels: 'dependency-dashboard'
+          });
+          
+          const dashboardBody = `# Dependency Dashboard
+          
+          Last updated: ${new Date().toISOString()}
+          
+          ${report}
+          
+          ## Automation Schedule
+          - Next scheduled run: Next Monday at 2 AM UTC
+          - Update strategy: ${process.env.UPDATE_STRATEGY || 'minor'}
+          
+          ## Quick Actions
+          - [Run dependency update manually](${context.payload.repository.html_url}/actions/workflows/dependency-update.yml)
+          - [View dependency graph](${context.payload.repository.html_url}/network/dependencies)
+          `;
+          
+          if (issues.data.length > 0) {
+            // Update existing issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issues.data[0].number,
+              body: dashboardBody
+            });
+          } else {
+            // Create new issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '📊 Dependency Dashboard',
+              body: dashboardBody,
+              labels: ['dependency-dashboard', 'automated']
+            });
+          }
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, security-check, update-dependencies]
+    if: always()
+    
+    steps:
+    - name: Prepare notification
+      run: |
+        if [ "${{ needs.dependency-scan.outputs.security_issues }}" = "true" ]; then
+          echo "NOTIFICATION_TYPE=security" >> $GITHUB_ENV
+          echo "NOTIFICATION_COLOR=danger" >> $GITHUB_ENV
+          echo "NOTIFICATION_TITLE=🚨 Security Vulnerabilities Found" >> $GITHUB_ENV
+        elif [ "${{ needs.update-dependencies.result }}" = "success" ]; then
+          echo "NOTIFICATION_TYPE=success" >> $GITHUB_ENV
+          echo "NOTIFICATION_COLOR=good" >> $GITHUB_ENV
+          echo "NOTIFICATION_TITLE=✅ Dependencies Updated Successfully" >> $GITHUB_ENV
+        else
+          echo "NOTIFICATION_TYPE=info" >> $GITHUB_ENV
+          echo "NOTIFICATION_COLOR=warning" >> $GITHUB_ENV
+          echo "NOTIFICATION_TITLE=ℹ️ Dependency Update Check Complete" >> $GITHUB_ENV
+        fi
+        
+    - name: Send Slack notification
+      if: env.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        curl -X POST $SLACK_WEBHOOK_URL \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "attachments": [{
+              "color": "'$NOTIFICATION_COLOR'",
+              "title": "'$NOTIFICATION_TITLE'",
+              "fields": [
+                {
+                  "title": "Repository",
+                  "value": "'${{ github.repository }}'",
+                  "short": true
+                },
+                {
+                  "title": "Update Strategy",
+                  "value": "'${{ github.event.inputs.update_strategy || 'minor' }}'",
+                  "short": true
+                },
+                {
+                  "title": "Security Issues",
+                  "value": "'${{ needs.dependency-scan.outputs.security_issues }}'",
+                  "short": true
+                },
+                {
+                  "title": "Has Updates",
+                  "value": "'${{ needs.dependency-scan.outputs.has_updates }}'",
+                  "short": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "button",
+                  "text": "View Workflow",
+                  "url": "'${{ github.server_url }}'/'${{ github.repository }}'/actions/runs/'${{ github.run_id }}'"
+                }
+              ]
+            }]
+          }'

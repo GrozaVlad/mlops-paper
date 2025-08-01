@@ -1,0 +1,220 @@
+{
+  "approval_policies": {
+    "development": {
+      "approval_required": false,
+      "auto_approve": true,
+      "validators": ["basic_tests", "security_scan"],
+      "notification_channels": ["#drugban-dev"]
+    },
+    "staging": {
+      "approval_required": true,
+      "auto_approve_conditions": {
+        "auto_approve_users": ["ci-bot", "staging-deployer"],
+        "emergency": false,
+        "off_hours_auto_approve": true,
+        "max_critical_vulnerabilities": 0,
+        "min_test_coverage": 80
+      },
+      "validators": ["basic_tests", "security_scan", "integration_tests", "model_validation"],
+      "notification_channels": ["#drugban-staging", "#drugban-alerts"],
+      "approval_timeout_hours": 24
+    },
+    "production": {
+      "approval_required": true,
+      "auto_approve_conditions": {
+        "auto_approve_users": ["prod-admin", "release-manager"],
+        "emergency": false,
+        "off_hours_auto_approve": false,
+        "max_critical_vulnerabilities": 0,
+        "min_test_coverage": 95,
+        "min_model_score": 85,
+        "deployment_window": {
+          "allowed_days": [1, 2, 3, 4, 5],
+          "allowed_hours": [9, 10, 11, 14, 15, 16],
+          "timezone": "UTC"
+        }
+      },
+      "validators": [
+        "basic_tests", 
+        "security_scan", 
+        "integration_tests", 
+        "model_validation", 
+        "performance_tests",
+        "load_tests",
+        "compliance_checks"
+      ],
+      "notification_channels": ["#drugban-production", "#drugban-alerts", "#security-alerts"],
+      "approval_timeout_hours": 72,
+      "required_approvers": 2,
+      "approval_groups": ["production-deployers", "security-team", "model-team"]
+    }
+  },
+  "validation_rules": {
+    "basic_tests": {
+      "description": "Unit and integration tests must pass",
+      "required": true,
+      "criteria": {
+        "test_success_rate": ">= 100%",
+        "coverage_threshold": ">= 80%"
+      }
+    },
+    "security_scan": {
+      "description": "Security vulnerabilities within acceptable limits",
+      "required": true,
+      "criteria": {
+        "critical_vulnerabilities": "== 0",
+        "high_vulnerabilities": "<= 2",
+        "secrets_detected": "== 0"
+      }
+    },
+    "integration_tests": {
+      "description": "API and service integration tests pass",
+      "required": true,
+      "criteria": {
+        "api_success_rate": ">= 95%",
+        "service_availability": ">= 99%"
+      }
+    },
+    "model_validation": {
+      "description": "ML model performance validation",
+      "required": true,
+      "criteria": {
+        "model_accuracy": ">= 75%",
+        "prediction_confidence": ">= 70%",
+        "inference_latency": "<= 2000ms"
+      }
+    },
+    "performance_tests": {
+      "description": "Load and performance requirements met",
+      "required": true,
+      "criteria": {
+        "response_time_p95": "<= 2000ms",
+        "throughput_rps": ">= 10",
+        "error_rate": "<= 1%"
+      }
+    },
+    "load_tests": {
+      "description": "System can handle expected load",
+      "required": false,
+      "criteria": {
+        "sustained_rps": ">= 50",
+        "spike_handling": "true",
+        "resource_utilization": "<= 80%"
+      }
+    },
+    "compliance_checks": {
+      "description": "Regulatory compliance requirements",
+      "required": true,
+      "criteria": {
+        "fda_21_cfr_part_11": "compliant",
+        "gdpr_compliance": "compliant",
+        "data_governance": "compliant"
+      }
+    }
+  },
+  "notification_templates": {
+    "approval_request": {
+      "title": "🔐 Deployment Approval Required",
+      "message": "Deployment to {{environment}} requires approval.\n\n**Details:**\n- Environment: {{environment}}\n- Image: {{image_tag}}\n- Commit: {{commit_sha}}\n- Requested by: {{actor}}\n\n**Validation Status:**\n{{validation_summary}}\n\n**Action Required:**\nPlease review and approve/reject the deployment in GitHub Actions."
+    },
+    "approval_granted": {
+      "title": "✅ Deployment Approved",
+      "message": "Deployment to {{environment}} has been approved.\n\n**Details:**\n- Environment: {{environment}}\n- Image: {{image_tag}}\n- Approved by: {{approver}}\n- Approval type: {{approval_type}}\n\n**Next Steps:**\nDeployment will proceed automatically."
+    },
+    "approval_rejected": {
+      "title": "❌ Deployment Rejected",
+      "message": "Deployment to {{environment}} has been rejected.\n\n**Details:**\n- Environment: {{environment}}\n- Image: {{image_tag}}\n- Rejected by: {{rejector}}\n- Reason: {{rejection_reason}}\n\n**Next Steps:**\nPlease address the issues and resubmit."
+    },
+    "validation_failed": {
+      "title": "⚠️ Pre-deployment Validation Failed",
+      "message": "Pre-deployment validation failed for {{environment}}.\n\n**Failed Checks:**\n{{failed_validations}}\n\n**Details:**\n{{validation_details}}\n\n**Action Required:**\nPlease fix the validation issues before requesting approval."
+    }
+  },
+  "emergency_procedures": {
+    "hotfix_deployment": {
+      "description": "Emergency hotfix deployment procedure",
+      "auto_approve": true,
+      "skip_validations": ["load_tests", "performance_tests"],
+      "required_validations": ["security_scan", "basic_tests"],
+      "notification_escalation": ["#incident-response", "#leadership"],
+      "post_deployment_actions": [
+        "schedule_full_validation",
+        "create_incident_report",
+        "notify_stakeholders"
+      ]
+    },
+    "security_patch": {
+      "description": "Critical security patch deployment",
+      "auto_approve": true,
+      "skip_validations": ["performance_tests"],
+      "required_validations": ["security_scan", "basic_tests", "integration_tests"],
+      "notification_escalation": ["#security-team", "#incident-response"],
+      "post_deployment_actions": [
+        "verify_security_fix",
+        "update_security_documentation",
+        "schedule_full_testing"
+      ]
+    }
+  },
+  "rollback_policies": {
+    "automatic_rollback": {
+      "triggers": [
+        "deployment_failure",
+        "health_check_failure",
+        "error_rate_spike"
+      ],
+      "conditions": {
+        "error_rate_threshold": ">= 5%",
+        "health_check_failures": ">= 3",
+        "response_time_degradation": ">= 200%"
+      },
+      "notification_channels": ["#drugban-alerts", "#incident-response"]
+    },
+    "manual_rollback": {
+      "approval_required": true,
+      "approvers": ["production-deployers", "incident-commander"],
+      "notification_channels": ["#drugban-production", "#leadership"]
+    }
+  },
+  "deployment_windows": {
+    "production": {
+      "regular_window": {
+        "days": ["Tuesday", "Wednesday", "Thursday"],
+        "hours": ["09:00-11:00", "14:00-16:00"],
+        "timezone": "UTC",
+        "exceptions": ["emergency", "security_patch"]
+      },
+      "maintenance_window": {
+        "days": ["Saturday"],
+        "hours": ["02:00-06:00"],
+        "timezone": "UTC",
+        "allowed_types": ["major_updates", "infrastructure_changes"]
+      }
+    },
+    "staging": {
+      "regular_window": {
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+        "hours": ["00:00-23:59"],
+        "timezone": "UTC"
+      }
+    }
+  },
+  "audit_requirements": {
+    "retention_period_days": 2555,
+    "required_fields": [
+      "deployment_id",
+      "environment",
+      "image_tag",
+      "commit_sha",
+      "approval_timestamp",
+      "approver",
+      "validation_results",
+      "deployment_outcome"
+    ],
+    "compliance_reports": [
+      "fda_21_cfr_part_11",
+      "sox_compliance",
+      "audit_trail"
+    ]
+  }
+}

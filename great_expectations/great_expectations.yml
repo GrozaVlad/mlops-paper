@@ -1,0 +1,73 @@
+# Great Expectations Configuration for MLOps Drug Repurposing Project
+
+# This is the primary configuration file for Great Expectations
+# It contains configuration for data sources, stores, and validation operators
+
+config_version: 3.0
+
+# Data sources configuration
+datasources:
+  mlops_drug_data:
+    class_name: Datasource
+    execution_engine:
+      class_name: PandasExecutionEngine
+    data_connectors:
+      default_runtime_data_connector_name:
+        class_name: RuntimeDataConnector
+        batch_identifiers:
+          - default_identifier_name
+      default_inferred_data_connector_name:
+        class_name: InferredAssetFilesystemDataConnector
+        base_directory: ../data/raw/sample/
+        default_regex:
+          group_names:
+            - data_asset_name
+          pattern: (.*)\.csv
+
+# Stores configuration for expectations, validations, and data docs
+stores:
+  expectations_store:
+    class_name: ExpectationsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: expectations/
+
+  validations_store:
+    class_name: ValidationsStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/validations/
+
+  evaluation_parameter_store:
+    class_name: EvaluationParameterStore
+
+  checkpoint_store:
+    class_name: CheckpointStore
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: checkpoints/
+
+# Data documentation configuration
+data_docs_sites:
+  local_site:
+    class_name: SiteBuilder
+    show_how_to_buttons: true
+    store_backend:
+      class_name: TupleFilesystemStoreBackend
+      base_directory: uncommitted/data_docs/local_site/
+    site_index_builder:
+      class_name: DefaultSiteIndexBuilder
+
+# Default expectation suite and checkpoint configurations
+expectations_store_name: expectations_store
+validations_store_name: validations_store
+evaluation_parameter_store_name: evaluation_parameter_store
+checkpoint_store_name: checkpoint_store
+
+# Additional configuration
+anonymous_usage_statistics:
+  enabled: false
+  data_context_id: mlops-drug-repurposing-context
+
+# Notebook configuration
+notebooks:

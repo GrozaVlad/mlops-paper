@@ -1,0 +1,287 @@
+# Prometheus Configuration for DrugBAN MLOps Monitoring
+# Comprehensive scraping setup for all system components
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'drugban-cluster'
+    environment: 'production'
+
+# Rule files for alerting
+rule_files:
+  - "alerts/*.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # DrugBAN API metrics
+  - job_name: 'drugban-api'
+    static_configs:
+      - targets: ['drugban-api:8000']
+    scrape_interval: 10s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'drugban-api'
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'api'
+
+  # DrugBAN custom model metrics
+  - job_name: 'drugban-model-metrics'
+    static_configs:
+      - targets: ['drugban-api:8001']  # Custom metrics endpoint
+    scrape_interval: 5s
+    metrics_path: /metrics
+    scrape_timeout: 8s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'model'
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'redis'
+
+  # MLflow metrics
+  - job_name: 'mlflow'
+    static_configs:
+      - targets: ['mlflow:5000']
+    scrape_interval: 60s
+    metrics_path: /metrics
+    scrape_timeout: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'mlflow'
+
+  # NGINX metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    scrape_interval: 30s
+    metrics_path: /nginx_status
+    scrape_timeout: 5s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'nginx'
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'system'
+
+  # cAdvisor for container metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 30s
+    metrics_path: /metrics
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'containers'
+
+  # Kubernetes API Server (if running in K8s)
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+            - default
+            - kube-system
+            - drugban
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+        action: keep
+        regex: default;kubernetes;https
+
+  # Kubernetes Nodes
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics
+
+  # Kubernetes Pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - drugban
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: kubernetes_pod_name
+
+  # Kubernetes Services
+  - job_name: 'kubernetes-services'
+    kubernetes_sd_configs:
+      - role: service
+        namespaces:
+          names:
+            - drugban
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+        action: replace
+        target_label: __scheme__
+        regex: (https?)
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        action: replace
+        target_label: kubernetes_name
+
+  # Application-specific metrics for drug discovery
+  - job_name: 'drugban-experiments'
+    static_configs:
+      - targets: ['mlflow:5000']
+    scrape_interval: 120s  # Less frequent for experiment data
+    metrics_path: /api/2.0/mlflow/experiments/metrics
+    params:
+      format: ['prometheus']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'experiments'
+
+  # Data drift monitoring
+  - job_name: 'drugban-drift-monitor'
+    static_configs:
+      - targets: ['drugban-api:8002']  # Drift monitoring endpoint
+    scrape_interval: 300s  # Every 5 minutes
+    metrics_path: /drift/metrics
+    scrape_timeout: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'drift-monitor'
+
+  # Model performance monitoring
+  - job_name: 'drugban-model-performance'
+    static_configs:
+      - targets: ['drugban-api:8003']  # Performance monitoring endpoint
+    scrape_interval: 60s
+    metrics_path: /performance/metrics
+    scrape_timeout: 15s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'performance-monitor'
+
+# Storage configuration
+storage:
+  tsdb:
+    retention.time: 30d
+    retention.size: 10GB
+    path: /prometheus/data
+    wal-compression: true
+
+# Recording rules for complex queries
+recording_rules:
+  - record: drugban:prediction_rate_5m
+    expr: rate(drugban_predictions_total[5m])
+    labels:
+      job: drugban-api
+
+  - record: drugban:error_rate_5m
+    expr: rate(drugban_failed_predictions_total[5m]) / rate(drugban_predictions_total[5m])
+    labels:
+      job: drugban-api
+
+  - record: drugban:avg_confidence_5m
+    expr: avg_over_time(drugban_prediction_confidence[5m])
+    labels:
+      job: drugban-api
+
+  - record: drugban:p95_latency_5m
+    expr: histogram_quantile(0.95, rate(drugban_prediction_latency_seconds_bucket[5m]))
+    labels:
+      job: drugban-api
+
+  - record: drugban:p99_latency_5m
+    expr: histogram_quantile(0.99, rate(drugban_prediction_latency_seconds_bucket[5m]))
+    labels:
+      job: drugban-api

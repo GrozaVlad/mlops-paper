@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/grozavlad/Projects/MLOpsProject/mlruns/553656969670105593/5aed78f8dc4c4fc2bf579e09e5761ddb/artifacts
+end_time: 1753539965737
+entry_point_name: ''
+experiment_id: '553656969670105593'
+lifecycle_stage: active
+run_id: 5aed78f8dc4c4fc2bf579e09e5761ddb
+run_name: validation_20250726_172605
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753539965699
+status: 3
+tags: []
+user_id: grozavlad

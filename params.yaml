@@ -1,0 +1,108 @@
+# Parameters for DVC pipeline stages
+
+# Data preprocessing parameters
+preprocess:
+  test_size: 0.2
+  validation_size: 0.2
+  random_state: 42
+  stratify: true
+  min_interactions_per_drug: 5
+  min_interactions_per_target: 5
+
+# Feature engineering parameters  
+features:
+  fingerprint_size: 2048
+  radius: 2
+  use_features:
+    - morgan_fingerprints
+    - molecular_descriptors
+    - target_features
+  normalize: true
+  feature_selection:
+    method: "variance_threshold"
+    threshold: 0.01
+
+# Model parameters
+model:
+  name: "DrugBAN"
+  version: "latest"
+  pretrained_path: "models/pretrained/"
+  hidden_dim: 256
+  dropout: 0.3
+  
+baseline:
+  model_type: "random_forest"
+  n_estimators: 100
+  max_depth: 10
+  random_state: 42
+
+# Training parameters
+training:
+  batch_size: 32
+  learning_rate: 0.0001
+  max_epochs: 100
+  early_stopping_patience: 10
+  validation_split: 0.2
+  num_workers: 2
+  gradient_clip_val: 1.0
+  accumulate_grad_batches: 1
+  random_seed: 42
+
+# Evaluation parameters
+evaluation:
+  metrics:
+    - auc
+    - precision
+    - recall
+    - f1_score
+    - accuracy
+  cross_validation_folds: 5
+  test_size: 0.2
+
+# MLflow tracking
+mlflow:
+  experiment_name: "drug_repurposing_baseline"
+  tracking_uri: "http://localhost:5000"  # Will be updated with actual MLflow server
+  run_name_prefix: "baseline_"
+
+# Data validation parameters
+validation:
+  max_missing_percentage: 0.1
+  min_samples: 100
+  min_quality_score: 80
+  required_columns:
+    drug_target_interactions:
+      - drug_id
+      - target_id
+      - interaction_type
+    drug_metadata:
+      - drug_id
+      - drug_name
+      - smiles
+    target_metadata:
+      - target_id
+      - target_name
+      - uniprot_id
+  
+  # Great Expectations configuration
+  great_expectations:
+    enabled: true
+    success_threshold: 0.95
+    
+  # Data quality thresholds
+  quality_thresholds:
+    completeness_threshold: 90
+    validity_threshold: 85
+    consistency_threshold: 90
+    
+  # Chemical validation settings
+  chemistry:
+    smiles_validity_threshold: 0.95
+    molecular_weight_range: [50, 2000]
+    lipinski_violations_threshold: 0.2
+    
+  # Dashboard settings
+  dashboard:
+    auto_generate: true
+    historical_tracking: true
+    alert_threshold: 70

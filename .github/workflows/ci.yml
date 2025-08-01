@@ -1,0 +1,605 @@
+name: DrugBAN MLOps CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/drugban-api
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  code-quality:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Run black code formatting check
+      run: |
+        black --check --diff api/ scripts/ monitoring/
+        
+    - name: Run isort import sorting check
+      run: |
+        isort --check-only --diff api/ scripts/ monitoring/
+        
+    - name: Run flake8 linting
+      run: |
+        flake8 api/ scripts/ monitoring/ --max-line-length=120 --extend-ignore=E203,W503
+        
+    - name: Run pylint
+      run: |
+        pylint api/ scripts/ --rcfile=.pylintrc || true
+        
+    - name: Run mypy type checking
+      run: |
+        mypy api/ --ignore-missing-imports || true
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Set environment variables
+      run: |
+        echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+        echo "SECRET_KEY=test-secret-key-for-ci" >> $GITHUB_ENV
+        echo "MLFLOW_TRACKING_URI=file:///tmp/mlruns" >> $GITHUB_ENV
+        
+    - name: Run unit tests
+      run: |
+        pytest tests/ -v --cov=api --cov=scripts --cov=monitoring \
+          --cov-report=xml --cov-report=html --cov-report=term-missing \
+          --junitxml=pytest-results.xml
+          
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          pytest-results.xml
+          htmlcov/
+        retention-days: 30
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+      
+      elasticsearch:
+        image: elasticsearch:8.5.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: -Xms512m -Xmx512m
+          
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+        
+    - name: Wait for services
+      run: |
+        # Wait for Redis
+        timeout 60 bash -c 'until redis-cli -h localhost ping; do sleep 1; done'
+        
+        # Wait for Elasticsearch
+        timeout 120 bash -c 'until curl -s http://localhost:9200/_cluster/health; do sleep 2; done'
+        
+    - name: Set environment variables
+      run: |
+        echo "REDIS_URL=redis://localhost:6379" >> $GITHUB_ENV
+        echo "SECRET_KEY=test-secret-key-for-ci" >> $GITHUB_ENV
+        echo "ELASTICSEARCH_URL=http://localhost:9200" >> $GITHUB_ENV
+        
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --maxfail=5
+        
+    - name: Test API endpoints
+      run: |
+        # Start API in background
+        cd api && python -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+        API_PID=$!
+        
+        # Wait for API to start
+        timeout 60 bash -c 'until curl -s http://localhost:8000/health; do sleep 2; done'
+        
+        # Run API tests
+        python -m pytest tests/api/ -v
+        
+        # Cleanup
+        kill $API_PID || true
+
+  model-validation:
+    name: Model Validation
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download test data
+      run: |
+        mkdir -p data/test
+        # Create minimal test data for CI
+        python -c "
+import pandas as pd
+import numpy as np
+
+# Create test drug-target interaction data
+test_data = pd.DataFrame({
+    'drug_id': [f'DRUG_{i}' for i in range(50)],
+    'target_id': [f'TARGET_{i%10}' for i in range(50)],
+    'smiles': ['CCO'] * 50,  # Simple ethanol SMILES for testing
+    'interaction': np.random.randint(0, 2, 50),
+    'confidence': np.random.random(50)
+})
+test_data.to_csv('data/test/test_interactions.csv', index=False)
+"
+        
+    - name: Validate data quality
+      run: |
+        python scripts/validate_data.py --test-mode
+        
+    - name: Test feature extraction
+      run: |
+        python scripts/generate_molecular_fingerprints.py --test-mode
+        
+    - name: Test model inference
+      run: |
+        python scripts/model_inference.py --test-mode
+        
+    - name: Model performance validation
+      run: |
+        python scripts/evaluate_baseline.py --test-mode
+        
+    - name: Upload model artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-validation-artifacts
+        path: |
+          data/test/
+          models/test/
+        retention-days: 7
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Bandit security scan
+      run: |
+        pip install bandit[toml]
+        bandit -r api/ scripts/ monitoring/ -f json -o bandit-report.json || true
+        bandit -r api/ scripts/ monitoring/ -f txt
+        
+    - name: Run Safety dependency scan
+      run: |
+        pip install safety
+        safety check --json --output safety-report.json || true
+        safety check
+        
+    - name: Scan for secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+        
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+        retention-days: 30
+
+  build-docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, model-validation]
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+      image-tag: ${{ steps.meta.outputs.tags }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        build-args: |
+          BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          VCS_REF=${{ github.sha }}
+          
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  staging-approval:
+    name: Staging Deployment Approval
+    runs-on: ubuntu-latest
+    needs: [build-docker, security-scan]
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    outputs:
+      approved: ${{ steps.approval.outputs.deployment_approved }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run staging approval workflow
+      id: approval
+      uses: ./.github/workflows/deployment-approval.yml
+      with:
+        environment: staging
+        image_tag: ${{ needs.build-docker.outputs.image-tag }}
+        approval_required: true
+        auto_approve_conditions: '{"auto_approve_users": ["ci-bot"], "off_hours_auto_approve": true}'
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-docker, security-scan, staging-approval]
+    if: needs.staging-approval.outputs.approved == 'true'
+    environment: 
+      name: staging
+      url: https://drugban-staging.example.com
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.12.0'
+        
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG_STAGING }}" | base64 -d > ~/.kube/config
+        
+    - name: Deploy to staging
+      run: |
+        helm upgrade --install drugban-staging ./helm/drugban \
+          --namespace drugban-staging \
+          --create-namespace \
+          --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+          --set image.tag=${{ github.sha }} \
+          --set environment=staging \
+          --set replicas=2 \
+          --set resources.requests.memory=512Mi \
+          --set resources.limits.memory=2Gi \
+          --wait --timeout=600s
+          
+    - name: Run staging tests
+      run: |
+        # Wait for deployment
+        kubectl wait --for=condition=ready pod -l app=drugban-api -n drugban-staging --timeout=300s
+        
+        # Get service endpoint
+        STAGING_URL=$(kubectl get service drugban-api-service -n drugban-staging -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        # Run health check
+        curl -f "http://${STAGING_URL}/health" || exit 1
+        
+        # Run basic API tests
+        python tests/staging/test_api_endpoints.py --base-url "http://${STAGING_URL}"
+        
+    - name: Notify deployment status
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#drugban-deployments'
+        text: |
+          Staging deployment ${{ job.status }}
+          Branch: ${{ github.ref }}
+          Commit: ${{ github.sha }}
+          Image: ${{ needs.build-docker.outputs.image-tag }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  production-approval:
+    name: Production Deployment Approval
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+    outputs:
+      approved: ${{ steps.approval.outputs.deployment_approved }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run production approval workflow
+      id: approval
+      uses: ./.github/workflows/deployment-approval.yml
+      with:
+        environment: production
+        image_tag: ${{ needs.build-docker.outputs.image-tag }}
+        approval_required: true
+        auto_approve_conditions: '{"auto_approve_users": ["prod-admin", "release-manager"], "emergency": false}'
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, production-approval]
+    if: needs.production-approval.outputs.approved == 'true'
+    environment: 
+      name: production
+      url: https://drugban.example.com
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      
+    - name: Setup Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: '3.12.0'
+        
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG_PRODUCTION }}" | base64 -d > ~/.kube/config
+        
+    - name: Deploy to production with blue-green strategy
+      run: |
+        # Deploy to blue environment first
+        helm upgrade --install drugban-blue ./helm/drugban \
+          --namespace drugban-production \
+          --create-namespace \
+          --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+          --set image.tag=${{ github.sha }} \
+          --set environment=production \
+          --set deployment.strategy=blue-green \
+          --set deployment.slot=blue \
+          --set replicas=3 \
+          --set resources.requests.memory=1Gi \
+          --set resources.limits.memory=4Gi \
+          --wait --timeout=600s
+          
+    - name: Validate blue deployment
+      run: |
+        # Run comprehensive validation
+        kubectl wait --for=condition=ready pod -l app=drugban-api,slot=blue -n drugban-production --timeout=300s
+        
+        # Get blue service endpoint
+        BLUE_URL=$(kubectl get service drugban-api-blue -n drugban-production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        
+        # Run health checks
+        curl -f "http://${BLUE_URL}/health" || exit 1
+        
+        # Run production validation tests
+        python tests/production/test_model_performance.py --base-url "http://${BLUE_URL}"
+        python tests/production/test_load_capacity.py --base-url "http://${BLUE_URL}"
+        
+    - name: Switch traffic to blue (complete deployment)
+      run: |
+        # Update service to point to blue deployment
+        kubectl patch service drugban-api-service -n drugban-production \
+          -p '{"spec":{"selector":{"slot":"blue"}}}'
+          
+        # Wait for traffic switch
+        sleep 30
+        
+        # Verify production endpoint
+        PROD_URL=$(kubectl get service drugban-api-service -n drugban-production -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        curl -f "http://${PROD_URL}/health" || exit 1
+        
+    - name: Cleanup old green deployment
+      run: |
+        # Remove old green deployment after successful blue deployment
+        helm uninstall drugban-green -n drugban-production || true
+        
+    - name: Notify production deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#drugban-production'
+        text: |
+          🚀 Production deployment ${{ job.status }}
+          Image: ${{ needs.build-docker.outputs.image-tag }}
+          Commit: ${{ github.sha }}
+          URL: https://drugban.example.com
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  compliance-report:
+    name: Generate Compliance Report
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Generate compliance report
+      run: |
+        # Create compliance report for regulatory requirements
+        python scripts/generate_compliance_report.py \
+          --deployment-id "${{ github.sha }}" \
+          --environment "production" \
+          --timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+    - name: Upload compliance artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-report-${{ github.sha }}
+        path: |
+          compliance/
+          audit-logs/
+        retention-days: 2555  # 7 years for regulatory compliance
+        
+    - name: Archive compliance report
+      run: |
+        # Archive to long-term storage for regulatory compliance
+        aws s3 cp compliance/ s3://drugban-compliance-archive/reports/${{ github.sha }}/ --recursive
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: us-east-1

@@ -1,0 +1,10 @@
+artifact_location: /Users/grozavlad/Projects/MLOpsProject/mlflow_artifacts/drug_repurposing_baseline/models/m-d89547d6d03742a381a87338c504521f/artifacts
+creation_timestamp: 1753538437649
+experiment_id: '897862512375808083'
+last_updated_timestamp: 1753538439049
+model_id: m-d89547d6d03742a381a87338c504521f
+model_type: null
+name: model
+source_run_id: 4abac464febc4e9db931da01f00c3f0b
+status: 2
+status_message: null

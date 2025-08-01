@@ -1,0 +1,14 @@
+artifact_uri: /Users/grozavlad/Projects/MLOpsProject/mlflow_artifacts/drug_repurposing_production/a215069eea7e4650a8058c59a3ad6861/artifacts
+end_time: 1753538349642
+entry_point_name: ''
+experiment_id: '286192777847829428'
+lifecycle_stage: active
+run_id: a215069eea7e4650a8058c59a3ad6861
+run_name: connection_test
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753538349637
+status: 3
+tags: []
+user_id: grozavlad

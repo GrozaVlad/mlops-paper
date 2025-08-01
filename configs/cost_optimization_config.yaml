@@ -1,0 +1,335 @@
+# Infrastructure Cost Optimization Configuration
+
+cost_optimization:
+  # Analysis settings
+  analysis:
+    # Default analysis period (days)
+    default_period_days: 30
+    
+    # Cost data granularity
+    granularity: DAILY  # DAILY, MONTHLY
+    
+    # Currency for cost calculations
+    currency: USD
+    
+    # Include credits and refunds
+    include_credits: false
+    
+    # Minimum cost threshold for analysis (ignore resources below this)
+    minimum_cost_threshold: 10.0
+    
+  # Resource utilization thresholds
+  thresholds:
+    # CPU utilization thresholds (%)
+    cpu_utilization_low: 20      # Below this is considered underutilized
+    cpu_utilization_high: 80     # Above this is considered well-utilized
+    
+    # Memory utilization thresholds (%)
+    memory_utilization_low: 30
+    memory_utilization_high: 85
+    
+    # Network utilization thresholds (MB/day)
+    network_traffic_low: 100
+    
+    # Storage utilization thresholds (%)
+    storage_utilization_low: 40
+    
+    # Idle time thresholds (hours/day)
+    idle_hours_threshold: 12     # Resources idle more than this are candidates
+    
+    # Database connection thresholds
+    db_connections_low: 5
+    
+    # Lambda invocation thresholds
+    lambda_invocations_low: 100
+    
+  # Optimization strategies
+  optimization:
+    # Enable specific optimization types
+    enable_rightsizing: true
+    enable_reserved_instances: true
+    enable_savings_plans: true
+    enable_spot_instances: true
+    enable_scheduling: true
+    enable_storage_optimization: true
+    enable_network_optimization: true
+    enable_auto_scaling: true
+    
+    # Reserved instance settings
+    reserved_instances:
+      minimum_runtime_days: 180   # Min days running to recommend RI
+      payment_option: partial     # all_upfront, partial_upfront, no_upfront
+      term_length: 1              # 1 or 3 years
+      
+    # Spot instance settings
+    spot_instances:
+      acceptable_interruption_rate: 5  # % interruption rate acceptable
+      excluded_workloads:
+        - production-database
+        - payment-processing
+        
+    # Scheduling settings
+    scheduling:
+      business_hours_start: 8     # 8 AM
+      business_hours_end: 18      # 6 PM
+      business_days:              # Mon=1, Sun=7
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+      timezone: "US/Eastern"
+      
+    # Storage optimization
+    storage:
+      s3_lifecycle_days:
+        standard_to_ia: 30        # Move to Infrequent Access after 30 days
+        ia_to_glacier: 90         # Move to Glacier after 90 days
+        glacier_to_deep: 180      # Move to Deep Archive after 180 days
+      ebs_snapshot_retention_days: 30
+      unused_volume_days: 7       # Delete unattached volumes after 7 days
+      
+  # Cost allocation and tagging
+  tagging:
+    required_tags:
+      - Environment
+      - Project
+      - Owner
+      - CostCenter
+      
+    tag_based_grouping:
+      - Environment
+      - Project
+      
+    untagged_resource_handling: flag  # flag, ignore, estimate
+    
+  # Specific service optimizations
+  services:
+    ec2:
+      # Instance family preferences for rightsizing
+      preferred_families:
+        - t3
+        - t3a
+        - m5
+        - m5a
+      
+      # Burstable instance settings
+      burstable_baseline_credit: 30  # Maintain 30% baseline credits
+      
+      # Auto-scaling recommendations
+      enable_auto_scaling_recommendations: true
+      scale_down_threshold: 30        # CPU % to scale down
+      scale_up_threshold: 70          # CPU % to scale up
+      
+    rds:
+      # Multi-AZ optimization
+      recommend_multi_az_removal: true  # For non-prod environments
+      
+      # Storage optimization
+      enable_storage_autoscaling: true
+      storage_utilization_target: 80    # Target 80% utilization
+      
+      # Backup optimization
+      backup_retention_prod: 7          # Days
+      backup_retention_non_prod: 1      # Days
+      
+    s3:
+      # Intelligent tiering
+      enable_intelligent_tiering: true
+      
+      # Lifecycle policies
+      enable_lifecycle_policies: true
+      
+      # Empty bucket detection
+      empty_bucket_retention_days: 30
+      
+      # Request metrics
+      enable_request_metrics: false     # Additional cost
+      
+    eks:
+      # Node optimization
+      enable_node_rightsizing: true
+      node_utilization_target: 70       # Target 70% utilization
+      
+      # Spot instances for worker nodes
+      spot_instance_percentage: 30      # 30% spot instances
+      
+      # Fargate optimization
+      consider_fargate: true
+      
+    lambda:
+      # Memory optimization
+      enable_memory_optimization: true
+      
+      # Concurrent execution limits
+      recommend_reserved_concurrency: true
+      
+      # Dead letter queue optimization
+      enable_dlq_cleanup: true
+      
+  # Notification and reporting
+  notifications:
+    # Cost anomaly detection
+    anomaly_detection:
+      enabled: true
+      threshold_percentage: 20    # Alert on 20% increase
+      
+    # Budget alerts
+    budget_alerts:
+      - name: monthly_total
+        amount: 10000
+        threshold_percentage: 80  # Alert at 80% of budget
+        
+      - name: ec2_budget
+        amount: 5000
+        service: EC2
+        threshold_percentage: 90
+        
+    # Notification channels
+    channels:
+      email:
+        enabled: true
+        recipients:
+          - devops-team@company.com
+          - finance@company.com
+          
+      slack:
+        enabled: true
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#infrastructure-costs"
+        
+      sns:
+        enabled: false
+        topic_arn: "arn:aws:sns:us-east-1:123456789012:cost-alerts"
+        
+  # Automated actions
+  automation:
+    # Enable automated optimizations
+    enable_auto_remediation: false
+    
+    # Approval required for actions above threshold
+    approval_threshold: 100       # $ per month
+    
+    # Automated actions
+    actions:
+      stop_idle_instances:
+        enabled: true
+        idle_days: 7
+        excluded_tags:
+          - AlwaysOn: "true"
+          
+      delete_unused_volumes:
+        enabled: true
+        unused_days: 30
+        
+      delete_old_snapshots:
+        enabled: true
+        retention_days: 90
+        
+      remove_unused_elastic_ips:
+        enabled: true
+        
+      downsize_underutilized_databases:
+        enabled: false            # Requires approval
+        
+  # Reporting configuration
+  reporting:
+    # Report generation schedule
+    schedule: "0 8 * * MON"       # Every Monday at 8 AM
+    
+    # Report formats
+    formats:
+      - html
+      - csv
+      - json
+      
+    # Report sections
+    include_sections:
+      - executive_summary
+      - cost_breakdown
+      - top_resources
+      - recommendations
+      - forecast
+      - savings_tracking
+      
+    # Historical comparison
+    comparison_periods:
+      - day_over_day
+      - week_over_week
+      - month_over_month
+      
+    # Visualization settings
+    visualizations:
+      enable_charts: true
+      chart_types:
+        - pie_chart
+        - bar_chart
+        - line_chart
+        - heatmap
+        
+  # Integration settings
+  integrations:
+    # AWS Cost Explorer
+    cost_explorer:
+      enable_recommendations: true
+      sync_frequency: daily
+      
+    # AWS Trusted Advisor
+    trusted_advisor:
+      enabled: true
+      check_categories:
+        - cost_optimization
+        - performance
+        - security
+        
+    # Third-party tools
+    third_party:
+      cloudability:
+        enabled: false
+        api_key: "${CLOUDABILITY_API_KEY}"
+        
+      cloudhealth:
+        enabled: false
+        api_key: "${CLOUDHEALTH_API_KEY}"
+        
+  # MLOps-specific optimizations
+  mlops:
+    # Model training optimization
+    training:
+      use_spot_instances: true
+      spot_max_price: 0.5         # 50% of on-demand price
+      checkpointing_enabled: true
+      
+    # Model serving optimization
+    serving:
+      enable_auto_scaling: true
+      scale_to_zero: true         # For dev environments
+      cache_predictions: true
+      batch_inference: true
+      
+    # Data pipeline optimization
+    data_pipeline:
+      use_spot_instances: true
+      enable_incremental_processing: true
+      compress_intermediate_data: true
+      
+    # Experiment tracking
+    experiment_tracking:
+      archive_old_experiments_days: 90
+      cleanup_failed_runs: true
+      
+  # Environment-specific settings
+  environments:
+    development:
+      aggressive_cost_cutting: true
+      business_hours_only: true
+      use_smallest_instances: true
+      
+    staging:
+      moderate_optimization: true
+      business_hours_extended: true
+      
+    production:
+      conservative_optimization: true
+      high_availability_required: true
+      no_service_interruption: true

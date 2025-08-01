@@ -1,0 +1,437 @@
+name: DrugBAN Model Training Pipeline
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'  # Weekly training on Sundays at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      dataset_version:
+        description: 'Dataset version to use for training'
+        required: true
+        default: 'latest'
+        type: string
+      experiment_name:
+        description: 'MLflow experiment name'
+        required: true
+        default: 'scheduled_training'
+        type: string
+      model_version:
+        description: 'Model version to register'
+        required: false
+        type: string
+
+env:
+  PYTHON_VERSION: '3.10'
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+jobs:
+  data-validation:
+    name: Data Validation and Preparation
+    runs-on: ubuntu-latest
+    outputs:
+      data-hash: ${{ steps.hash.outputs.hash }}
+      dataset-ready: ${{ steps.validation.outputs.ready }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download latest dataset
+      run: |
+        python scripts/download_datasets.py \
+          --version ${{ github.event.inputs.dataset_version || 'latest' }} \
+          --output-dir data/training
+          
+    - name: Validate data quality
+      id: validation
+      run: |
+        # Run comprehensive data validation
+        python scripts/validate_data.py \
+          --data-dir data/training \
+          --config configs/data_validation.yaml \
+          --output validation_report.json
+          
+        # Check if validation passed
+        if [ $? -eq 0 ]; then
+          echo "ready=true" >> $GITHUB_OUTPUT
+        else
+          echo "ready=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+    - name: Generate data hash
+      id: hash
+      run: |
+        # Create hash of training data for reproducibility
+        find data/training -type f -exec sha256sum {} \; | sort | sha256sum | cut -d' ' -f1 > data_hash.txt
+        echo "hash=$(cat data_hash.txt)" >> $GITHUB_OUTPUT
+        
+    - name: Upload validation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: data-validation-${{ steps.hash.outputs.hash }}
+        path: |
+          validation_report.json
+          data_hash.txt
+          data/training/
+        retention-days: 30
+
+  model-training:
+    name: Model Training and Hyperparameter Optimization
+    runs-on: ubuntu-latest
+    needs: data-validation
+    if: needs.data-validation.outputs.dataset-ready == 'true'
+    
+    strategy:
+      matrix:
+        training_config:
+          - name: "baseline"
+            config: "configs/training_baseline.yaml"
+          - name: "optimized"
+            config: "configs/training_optimized.yaml"
+          - name: "experimental"
+            config: "configs/training_experimental.yaml"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download training data
+      uses: actions/download-artifact@v3
+      with:
+        name: data-validation-${{ needs.data-validation.outputs.data-hash }}
+        path: ./
+        
+    - name: Set up MLflow
+      run: |
+        # Configure MLflow tracking
+        export MLFLOW_EXPERIMENT_NAME="${{ github.event.inputs.experiment_name || 'scheduled_training' }}"
+        python mlflow_setup.py production
+        
+    - name: Run hyperparameter optimization
+      run: |
+        python scripts/hyperparameter_tuning.py \
+          --config ${{ matrix.training_config.config }} \
+          --trials 50 \
+          --experiment-name "${{ github.event.inputs.experiment_name || 'scheduled_training' }}" \
+          --run-name "${{ matrix.training_config.name }}-${{ github.sha }}" \
+          --data-hash ${{ needs.data-validation.outputs.data-hash }}
+          
+    - name: Train best model
+      run: |
+        python scripts/train_model.py \
+          --config ${{ matrix.training_config.config }} \
+          --experiment-name "${{ github.event.inputs.experiment_name || 'scheduled_training' }}" \
+          --run-name "best-${{ matrix.training_config.name }}-${{ github.sha }}" \
+          --use-best-params \
+          --data-hash ${{ needs.data-validation.outputs.data-hash }}
+          
+    - name: Model evaluation
+      run: |
+        python scripts/cross_validation.py \
+          --model-path models/trained/best-${{ matrix.training_config.name }}.pt \
+          --config ${{ matrix.training_config.config }} \
+          --folds 5 \
+          --output evaluation_results_${{ matrix.training_config.name }}.json
+          
+    - name: Error analysis
+      run: |
+        python scripts/error_analysis.py \
+          --model-path models/trained/best-${{ matrix.training_config.name }}.pt \
+          --config ${{ matrix.training_config.config }} \
+          --output error_analysis_${{ matrix.training_config.name }}.json
+          
+    - name: Upload training artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: training-artifacts-${{ matrix.training_config.name }}
+        path: |
+          models/trained/
+          evaluation_results_*.json
+          error_analysis_*.json
+          logs/training/
+        retention-days: 90
+
+  model-comparison:
+    name: Model Comparison and Selection
+    runs-on: ubuntu-latest
+    needs: [data-validation, model-training]
+    outputs:
+      best-model: ${{ steps.selection.outputs.best_model }}
+      model-metrics: ${{ steps.selection.outputs.metrics }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Download all training artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: training-artifacts-*
+        path: artifacts/
+        merge-multiple: true
+        
+    - name: Compare model performance
+      id: selection
+      run: |
+        python scripts/model_comparison.py \
+          --models-dir artifacts/models/trained/ \
+          --evaluations-dir artifacts/ \
+          --output model_comparison_report.json \
+          --select-best
+          
+        # Extract best model info
+        BEST_MODEL=$(python -c "
+import json
+with open('model_comparison_report.json', 'r') as f:
+    data = json.load(f)
+    print(data['best_model']['name'])
+")
+        
+        METRICS=$(python -c "
+import json
+with open('model_comparison_report.json', 'r') as f:
+    data = json.load(f)
+    print(json.dumps(data['best_model']['metrics']))
+")
+        
+        echo "best_model=$BEST_MODEL" >> $GITHUB_OUTPUT
+        echo "metrics=$METRICS" >> $GITHUB_OUTPUT
+        
+    - name: Statistical significance testing
+      run: |
+        python scripts/statistical_testing.py \
+          --models-dir artifacts/models/trained/ \
+          --output statistical_analysis.json
+          
+    - name: Generate model report
+      run: |
+        python scripts/generate_model_report.py \
+          --comparison-report model_comparison_report.json \
+          --statistical-report statistical_analysis.json \
+          --output final_model_report.html
+          
+    - name: Upload comparison artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: model-comparison-report
+        path: |
+          model_comparison_report.json
+          statistical_analysis.json
+          final_model_report.html
+        retention-days: 365
+
+  model-registration:
+    name: Model Registration and Versioning
+    runs-on: ubuntu-latest
+    needs: [model-comparison]
+    if: needs.model-comparison.outputs.best-model != ''
+    
+    outputs:
+      model-version: ${{ steps.register.outputs.version }}
+      model-uri: ${{ steps.register.outputs.uri }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Download best model artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: training-artifacts-*
+        path: artifacts/
+        merge-multiple: true
+        
+    - name: Download comparison report
+      uses: actions/download-artifact@v3
+      with:
+        name: model-comparison-report
+        path: ./
+        
+    - name: Register model in MLflow
+      id: register
+      run: |
+        python scripts/register_model.py \
+          --model-name "DrugBAN" \
+          --model-path "artifacts/models/trained/${{ needs.model-comparison.outputs.best-model }}" \
+          --experiment-name "${{ github.event.inputs.experiment_name || 'scheduled_training' }}" \
+          --version "${{ github.event.inputs.model_version || github.sha }}" \
+          --description "Automated training from commit ${{ github.sha }}" \
+          --tags '{"source": "github-actions", "commit": "${{ github.sha }}", "training_date": "'$(date -u +%Y-%m-%d)'"}' \
+          --stage "Staging"
+          
+        # Get model info
+        MODEL_VERSION=$(python -c "
+import mlflow
+client = mlflow.tracking.MlflowClient()
+model = client.get_latest_versions('DrugBAN', stages=['Staging'])[0]
+print(model.version)
+")
+        
+        MODEL_URI="models:/DrugBAN/${MODEL_VERSION}"
+        
+        echo "version=$MODEL_VERSION" >> $GITHUB_OUTPUT
+        echo "uri=$MODEL_URI" >> $GITHUB_OUTPUT
+        
+    - name: Generate model metadata
+      run: |
+        python scripts/generate_model_metadata.py \
+          --model-uri "${{ steps.register.outputs.uri }}" \
+          --metrics '${{ needs.model-comparison.outputs.model-metrics }}' \
+          --commit "${{ github.sha }}" \
+          --output model_metadata.json
+          
+    - name: Upload model artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: registered-model-${{ steps.register.outputs.version }}
+        path: |
+          model_metadata.json
+        retention-days: 365
+
+  drift-detection-update:
+    name: Update Drift Detection Baselines
+    runs-on: ubuntu-latest
+    needs: [model-registration, data-validation]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Download training data
+      uses: actions/download-artifact@v3
+      with:
+        name: data-validation-${{ needs.data-validation.outputs.data-hash }}
+        path: ./
+        
+    - name: Update drift detection baselines
+      run: |
+        python monitoring/update_drift_baselines.py \
+          --training-data data/training/ \
+          --model-version ${{ needs.model-registration.outputs.model-version }} \
+          --output monitoring/baselines/
+          
+    - name: Commit updated baselines
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add monitoring/baselines/
+        git commit -m "Update drift detection baselines for model v${{ needs.model-registration.outputs.model-version }}" || exit 0
+        git push
+
+  performance-benchmarking:
+    name: Performance Benchmarking
+    runs-on: ubuntu-latest
+    needs: [model-registration]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Download model
+      run: |
+        python -c "
+import mlflow
+mlflow.artifacts.download_artifacts('${{ needs.model-registration.outputs.model-uri }}', dst_path='./benchmarking/')
+"
+        
+    - name: Run performance benchmarks
+      run: |
+        python scripts/benchmark_model.py \
+          --model-path benchmarking/ \
+          --benchmark-suite comprehensive \
+          --output benchmark_results.json
+          
+    - name: Generate performance report
+      run: |
+        python scripts/generate_performance_report.py \
+          --benchmark-results benchmark_results.json \
+          --model-version ${{ needs.model-registration.outputs.model-version }} \
+          --output performance_report.html
+          
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-benchmark-${{ needs.model-registration.outputs.model-version }}
+        path: |
+          benchmark_results.json
+          performance_report.html
+        retention-days: 365
+
+  notification:
+    name: Training Pipeline Notification
+    runs-on: ubuntu-latest
+    needs: [model-registration, drift-detection-update, performance-benchmarking]
+    if: always()
+    
+    steps:
+    - name: Notify training completion
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#drugban-training'
+        text: |
+          🧠 Model Training Pipeline ${{ job.status }}
+          
+          📊 **Training Results:**
+          - Best Model: ${{ needs.model-comparison.outputs.best-model }}
+          - Model Version: ${{ needs.model-registration.outputs.model-version }}
+          - Metrics: ${{ needs.model-comparison.outputs.model-metrics }}
+          
+          🔗 **Links:**
+          - MLflow: ${{ env.MLFLOW_TRACKING_URI }}
+          - Model URI: ${{ needs.model-registration.outputs.model-uri }}
+          
+          📈 **Next Steps:**
+          - Model registered in Staging
+          - Ready for validation and promotion
+          - Drift baselines updated
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

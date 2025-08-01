@@ -1,0 +1,362 @@
+# Automated Model Performance Evaluation Configuration
+# Configuration for comprehensive model performance monitoring and evaluation
+
+# Core evaluation metrics configuration
+evaluation_metrics:
+  # Primary performance metrics
+  primary_metrics:
+    - "accuracy"
+    - "auc"
+    - "precision"
+    - "recall"
+    - "f1_score"
+  
+  # Secondary performance metrics
+  secondary_metrics:
+    - "specificity"
+    - "npv"                      # Negative Predictive Value
+    - "mcc"                      # Matthews Correlation Coefficient
+    - "balanced_accuracy"
+  
+  # Confidence and calibration metrics
+  confidence_metrics:
+    - "prediction_confidence"
+    - "calibration_score"
+    - "confidence_distribution"
+  
+  # Operational efficiency metrics
+  efficiency_metrics:
+    - "inference_time"
+    - "memory_usage"
+    - "throughput"
+    - "cpu_utilization"
+
+# Performance threshold configuration
+performance_thresholds:
+  # Minimum acceptable performance levels
+  min_accuracy: 0.75             # 75% minimum accuracy
+  min_auc: 0.80                  # 80% minimum AUC
+  min_precision: 0.70            # 70% minimum precision
+  min_recall: 0.70               # 70% minimum recall
+  min_f1: 0.70                   # 70% minimum F1 score
+  min_mcc: 0.40                  # 40% minimum MCC
+  min_calibration_score: 0.80    # 80% minimum calibration
+  
+  # Operational thresholds
+  max_inference_time_ms: 1000    # 1 second max inference time
+  max_memory_usage_mb: 2048      # 2GB max memory usage
+  min_throughput_rps: 10         # 10 requests per second minimum
+
+# Dataset configuration for evaluation
+evaluation_datasets:
+  # Standard evaluation datasets
+  test_set: "data/test/"
+  validation_set: "data/validation/"
+  holdout_set: "data/holdout/"
+  
+  # Production data sampling
+  production_sample: "data/production_sample/"
+  
+  # Specialized test sets
+  edge_cases: "data/edge_cases/"
+  adversarial_test: "data/adversarial/"
+  
+  # Dataset-specific configurations
+  dataset_configs:
+    test_set:
+      sample_size: 10000
+      balanced: true
+      stratified: true
+    
+    production_sample:
+      sample_size: 5000
+      time_window_hours: 24
+      sampling_strategy: "random"
+
+# Trend analysis configuration
+trend_analysis:
+  # Historical performance tracking
+  lookback_days: 30              # 30 days of historical data
+  min_evaluations: 5             # Minimum evaluations for trend analysis
+  
+  # Statistical significance for trends
+  trend_significance_threshold: 0.05
+  performance_degradation_threshold: 0.05  # 5% degradation threshold
+  
+  # Trend detection algorithms
+  trend_detection:
+    - "linear_regression"
+    - "mann_kendall"             # Non-parametric trend test
+    - "changepoint_detection"
+  
+  # Alerting thresholds
+  alert_thresholds:
+    significant_degradation: 0.05  # 5% degradation
+    rapid_degradation: 0.10        # 10% rapid degradation
+    sustained_degradation_days: 3   # 3 days of degradation
+
+# Evaluation scheduling configuration
+evaluation_schedule:
+  # Regular evaluation frequency
+  frequency: "daily"             # Options: hourly, daily, weekly
+  evaluation_hour: 3             # 3 AM UTC for daily evaluations
+  weekend_evaluation: true       # Run evaluations on weekends
+  
+  # Triggered evaluations
+  trigger_conditions:
+    - "new_model_deployment"
+    - "data_drift_detected"
+    - "performance_alert"
+    - "manual_request"
+  
+  # Evaluation windows
+  evaluation_windows:
+    quick_check: 1               # 1 hour for quick evaluations
+    standard: 6                  # 6 hours for standard evaluations
+    comprehensive: 24            # 24 hours for comprehensive evaluations
+
+# Model comparison configuration
+model_comparison:
+  # Comparison strategies
+  comparison_methods:
+    - "statistical_testing"
+    - "bootstrap_comparison"
+    - "bayesian_comparison"
+  
+  # Statistical testing parameters
+  statistical_testing:
+    significance_level: 0.05
+    multiple_testing_correction: "bonferroni"
+    min_sample_size: 1000
+    confidence_interval: 0.95
+  
+  # Bootstrap comparison
+  bootstrap_config:
+    n_iterations: 10000
+    confidence_level: 0.95
+    random_seed: 42
+  
+  # Model ranking criteria
+  ranking_criteria:
+    primary_weight: 0.6          # Weight for primary metrics
+    secondary_weight: 0.3        # Weight for secondary metrics
+    efficiency_weight: 0.1       # Weight for efficiency metrics
+
+# Evaluation reporting configuration
+reporting:
+  # Report generation settings
+  generate_plots: true
+  save_detailed_results: true
+  create_performance_report: true
+  create_comparison_report: true
+  
+  # Notification settings
+  notify_on_degradation: true
+  notify_on_improvement: true
+  notification_channels:
+    - "slack"
+    - "email"
+  
+  # Report formats
+  report_formats:
+    - "json"
+    - "html"
+    - "pdf"
+  
+  # Report storage
+  report_storage:
+    local_path: "reports/evaluation/"
+    s3_bucket: "${EVALUATION_REPORTS_BUCKET}"
+    retention_days: 90
+
+# Advanced evaluation features
+advanced_features:
+  # Fairness evaluation
+  fairness_evaluation:
+    enable: true
+    protected_attributes: ["age_group", "gender"]
+    fairness_metrics:
+      - "demographic_parity"
+      - "equal_opportunity"
+      - "calibration"
+  
+  # Explainability evaluation
+  explainability:
+    enable: true
+    explanation_methods:
+      - "shap"
+      - "lime"
+      - "integrated_gradients"
+    explanation_consistency_threshold: 0.8
+  
+  # Robustness testing
+  robustness_testing:
+    enable: true
+    perturbation_types:
+      - "gaussian_noise"
+      - "feature_dropout"
+      - "adversarial_examples"
+    robustness_threshold: 0.9
+
+# Error analysis configuration
+error_analysis:
+  # Error categorization
+  error_categories:
+    - "false_positives"
+    - "false_negatives"
+    - "high_confidence_errors"
+    - "low_confidence_errors"
+  
+  # Error pattern detection
+  pattern_detection:
+    enable: true
+    clustering_method: "kmeans"
+    min_cluster_size: 50
+    similarity_threshold: 0.8
+  
+  # Error impact analysis
+  impact_analysis:
+    business_impact_weights:
+      false_positive: 0.3
+      false_negative: 0.7
+    cost_analysis: true
+
+# Model lifecycle integration
+lifecycle_integration:
+  # MLflow integration
+  mlflow:
+    tracking_uri: "${MLFLOW_TRACKING_URI}"
+    experiment_name: "model_evaluation"
+    log_metrics: true
+    log_artifacts: true
+    register_best_model: true
+  
+  # Model registry integration
+  model_registry:
+    promote_threshold: 0.85      # Promote if score > 85%
+    auto_promotion: false        # Manual approval required
+    staging_approval_required: true
+  
+  # CI/CD integration
+  cicd_integration:
+    fail_on_degradation: true
+    performance_gate: true
+    approval_workflow: true
+
+# Resource management
+resource_management:
+  # Computational resources
+  max_concurrent_evaluations: 3
+  evaluation_timeout_hours: 6
+  memory_limit_gb: 8
+  cpu_limit_cores: 4
+  
+  # Data management
+  max_dataset_size_gb: 10
+  cache_evaluation_data: true
+  cache_ttl_hours: 24
+  
+  # Cleanup policies
+  cleanup:
+    temporary_files_hours: 6
+    old_reports_days: 90
+    cached_data_days: 7
+
+# Monitoring and observability
+monitoring:
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    metrics_port: 8080
+    metrics_path: "/metrics"
+    
+    # Custom metrics
+    custom_metrics:
+      - name: "model_evaluation_duration"
+        type: "histogram"
+        help: "Duration of model evaluations"
+        buckets: [30, 60, 300, 600, 1800, 3600]
+      
+      - name: "model_performance_score"
+        type: "gauge"
+        help: "Current model performance score"
+        labels: ["model_name", "metric"]
+      
+      - name: "evaluation_errors_total"
+        type: "counter"
+        help: "Total evaluation errors"
+        labels: ["error_type"]
+  
+  # Health checks
+  health_checks:
+    endpoint: "/health"
+    interval_seconds: 30
+    timeout_seconds: 5
+  
+  # Logging configuration
+  logging:
+    level: "INFO"
+    format: "json"
+    output: "stdout"
+    log_file: "logs/evaluation.log"
+    rotation: "daily"
+    retention_days: 30
+
+# Security and compliance
+security:
+  # Data privacy
+  data_privacy:
+    anonymize_logs: true
+    encrypt_reports: true
+    mask_sensitive_fields: true
+  
+  # Access control
+  access_control:
+    require_authentication: true
+    authorized_users: ["ml-ops-team", "data-science-team"]
+    audit_access: true
+  
+  # Compliance
+  compliance:
+    gdpr_compliance: true
+    data_retention_policy: true
+    audit_trail: true
+
+# Feature flags
+feature_flags:
+  # Experimental features
+  enable_distributed_evaluation: false
+  enable_gpu_acceleration: false
+  enable_automated_retraining_trigger: true
+  enable_real_time_evaluation: false
+  
+  # Advanced analytics
+  enable_causal_analysis: false
+  enable_counterfactual_evaluation: false
+  enable_transfer_learning_evaluation: false
+
+# Environment-specific overrides
+environments:
+  development:
+    evaluation_schedule:
+      frequency: "manual"
+    performance_thresholds:
+      min_accuracy: 0.60
+    reporting:
+      notify_on_degradation: false
+  
+  staging:
+    evaluation_schedule:
+      frequency: "daily"
+    resource_management:
+      max_concurrent_evaluations: 2
+  
+  production:
+    evaluation_schedule:
+      frequency: "daily"
+    advanced_features:
+      fairness_evaluation:
+        enable: true
+    monitoring:
+      prometheus:
+        enabled: true

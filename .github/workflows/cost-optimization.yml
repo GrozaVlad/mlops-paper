@@ -1,0 +1,530 @@
+name: Infrastructure Cost Optimization
+
+on:
+  schedule:
+    # Run weekly cost analysis on Sundays at 6 AM UTC
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      analysis_period_days:
+        description: 'Analysis period in days'
+        required: false
+        default: '30'
+        type: string
+      enable_optimization:
+        description: 'Enable automated optimizations'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Perform dry run only'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  PYTHON_VERSION: '3.10'
+  AWS_DEFAULT_REGION: 'us-east-1'
+
+jobs:
+  cost-analysis:
+    name: Analyze Infrastructure Costs
+    runs-on: ubuntu-latest
+    outputs:
+      total_cost: ${{ steps.analysis.outputs.total_cost }}
+      potential_savings: ${{ steps.analysis.outputs.potential_savings }}
+      recommendations_count: ${{ steps.analysis.outputs.recommendations_count }}
+      
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install boto3 pandas numpy matplotlib seaborn pyyaml
+        
+    - name: Run cost analysis
+      id: analysis
+      run: |
+        PERIOD_DAYS="${{ github.event.inputs.analysis_period_days || '30' }}"
+        
+        python scripts/cost_optimization/cost_analyzer.py \
+          --period-days $PERIOD_DAYS \
+          --output-dir reports/cost_analysis/ \
+          > cost_analysis_output.txt 2>&1
+        
+        # Extract key metrics for outputs
+        TOTAL_COST=$(grep "Total Monthly Cost:" cost_analysis_output.txt | grep -o '\$[0-9,]*\.[0-9]*' | tr -d '$,' || echo "0")
+        POTENTIAL_SAVINGS=$(grep "Potential Savings:" cost_analysis_output.txt | grep -o '\$[0-9,]*\.[0-9]*' | tr -d '$,' || echo "0")
+        RECOMMENDATIONS=$(grep "Number of Recommendations:" cost_analysis_output.txt | grep -o '[0-9]*' || echo "0")
+        
+        echo "total_cost=$TOTAL_COST" >> $GITHUB_OUTPUT
+        echo "potential_savings=$POTENTIAL_SAVINGS" >> $GITHUB_OUTPUT
+        echo "recommendations_count=$RECOMMENDATIONS" >> $GITHUB_OUTPUT
+        
+        # Create summary for notification
+        echo "## Cost Analysis Summary" > cost_summary.md
+        echo "- **Analysis Period**: $PERIOD_DAYS days" >> cost_summary.md
+        echo "- **Total Monthly Cost**: \$$TOTAL_COST" >> cost_summary.md
+        echo "- **Potential Savings**: \$$POTENTIAL_SAVINGS" >> cost_summary.md
+        echo "- **Recommendations**: $RECOMMENDATIONS" >> cost_summary.md
+        
+    - name: Upload cost analysis artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: cost-analysis-reports
+        path: |
+          reports/cost_analysis/
+          cost_analysis_output.txt
+          cost_summary.md
+          
+    - name: Check cost thresholds
+      id: threshold_check
+      run: |
+        TOTAL_COST="${{ steps.analysis.outputs.total_cost }}"
+        BUDGET_LIMIT=10000  # $10,000 monthly budget limit
+        
+        if (( $(echo "$TOTAL_COST > $BUDGET_LIMIT" | bc -l) )); then
+          echo "budget_exceeded=true" >> $GITHUB_OUTPUT
+          echo "::warning::Monthly cost ($TOTAL_COST) exceeds budget limit ($BUDGET_LIMIT)"
+        else
+          echo "budget_exceeded=false" >> $GITHUB_OUTPUT
+        fi
+        
+        SAVINGS_THRESHOLD=500  # Alert if potential savings > $500
+        POTENTIAL_SAVINGS="${{ steps.analysis.outputs.potential_savings }}"
+        
+        if (( $(echo "$POTENTIAL_SAVINGS > $SAVINGS_THRESHOLD" | bc -l) )); then
+          echo "high_savings_potential=true" >> $GITHUB_OUTPUT
+        else
+          echo "high_savings_potential=false" >> $GITHUB_OUTPUT
+        fi
+
+  resource-optimization:
+    name: Optimize Resources
+    runs-on: ubuntu-latest
+    needs: cost-analysis
+    if: github.event.inputs.enable_optimization == 'true' || needs.cost-analysis.outputs.potential_savings > 1000
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install boto3 pyyaml schedule
+        
+    - name: Run resource optimization
+      run: |
+        DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+        
+        if [ "$DRY_RUN" = "true" ]; then
+          echo "Running optimization in dry-run mode..."
+          python scripts/cost_optimization/resource_optimizer.py --dry-run
+        else
+          echo "Running optimization with actual changes..."
+          python scripts/cost_optimization/resource_optimizer.py
+        fi
+        
+    - name: Generate optimization report
+      run: |
+        python -c "
+        from scripts.cost_optimization.resource_optimizer import ResourceOptimizer
+        import json
+        
+        optimizer = ResourceOptimizer(dry_run=${{ github.event.inputs.dry_run || 'true' }})
+        report = optimizer.generate_optimization_report()
+        
+        with open('optimization_report.json', 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        # Create markdown report
+        with open('optimization_summary.md', 'w') as f:
+            f.write('# Resource Optimization Summary\n\n')
+            f.write(f\"- **Total Actions**: {report['summary']['total_actions']}\n\")
+            f.write(f\"- **Completed**: {report['summary']['completed_actions']}\n\")
+            f.write(f\"- **Failed**: {report['summary']['failed_actions']}\n\")
+            f.write(f\"- **Monthly Savings**: \${report['summary']['total_monthly_savings']:,.2f}\n\")
+            f.write(f\"- **Yearly Savings**: \${report['summary']['total_yearly_savings']:,.2f}\n\")
+        "
+        
+    - name: Upload optimization artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: optimization-reports
+        path: |
+          optimization_report.json
+          optimization_summary.md
+
+  security-and-compliance:
+    name: Security and Compliance Check
+    runs-on: ubuntu-latest
+    needs: [cost-analysis, resource-optimization]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_DEFAULT_REGION }}
+        
+    - name: Check resource tags compliance
+      run: |
+        python -c "
+        import boto3
+        import json
+        from collections import defaultdict
+        
+        ec2 = boto3.client('ec2')
+        required_tags = ['Environment', 'Project', 'Owner', 'CostCenter']
+        
+        # Check EC2 instances
+        response = ec2.describe_instances()
+        untagged_resources = []
+        
+        for reservation in response['Reservations']:
+            for instance in reservation['Instances']:
+                if instance['State']['Name'] != 'terminated':
+                    instance_tags = {tag['Key']: tag['Value'] for tag in instance.get('Tags', [])}
+                    missing_tags = [tag for tag in required_tags if tag not in instance_tags]
+                    
+                    if missing_tags:
+                        untagged_resources.append({
+                            'resource_id': instance['InstanceId'],
+                            'resource_type': 'EC2',
+                            'missing_tags': missing_tags
+                        })
+        
+        compliance_report = {
+            'total_resources_checked': sum(len(r['Instances']) for r in response['Reservations']),
+            'untagged_resources': untagged_resources,
+            'compliance_percentage': (1 - len(untagged_resources) / max(1, sum(len(r['Instances']) for r in response['Reservations']))) * 100
+        }
+        
+        with open('compliance_report.json', 'w') as f:
+            json.dump(compliance_report, f, indent=2)
+        
+        print(f'Compliance: {compliance_report[\"compliance_percentage\"]:.1f}%')
+        print(f'Untagged resources: {len(untagged_resources)}')
+        "
+        
+    - name: Upload compliance report
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-report
+        path: compliance_report.json
+
+  generate-dashboard:
+    name: Generate Cost Dashboard
+    runs-on: ubuntu-latest
+    needs: [cost-analysis, resource-optimization, security-and-compliance]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install dependencies
+      run: |
+        pip install matplotlib seaborn pandas numpy jinja2
+        
+    - name: Generate comprehensive dashboard
+      run: |
+        python -c "
+        import json
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        from datetime import datetime, timedelta
+        import os
+        
+        # Load reports
+        reports = {}
+        
+        if os.path.exists('cost-analysis-reports/cost_analysis_output.txt'):
+            with open('cost-analysis-reports/cost_analysis_output.txt', 'r') as f:
+                reports['cost_analysis'] = f.read()
+        
+        if os.path.exists('optimization-reports/optimization_report.json'):
+            with open('optimization-reports/optimization_report.json', 'r') as f:
+                reports['optimization'] = json.load(f)
+        
+        if os.path.exists('compliance-report/compliance_report.json'):
+            with open('compliance-report/compliance_report.json', 'r') as f:
+                reports['compliance'] = json.load(f)
+        
+        # Generate HTML dashboard
+        html_content = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Infrastructure Cost Dashboard</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }}
+                .container {{ max-width: 1200px; margin: 0 auto; }}
+                .card {{ background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .metric {{ display: inline-block; margin: 10px 20px; text-align: center; }}
+                .metric-value {{ font-size: 2em; font-weight: bold; color: #2196F3; }}
+                .metric-label {{ color: #666; }}
+                .savings {{ color: #4CAF50; }}
+                .warning {{ color: #FF9800; }}
+                .error {{ color: #f44336; }}
+                h1, h2 {{ color: #333; }}
+                .status-good {{ background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; }}
+                .status-warning {{ background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; }}
+                .status-error {{ background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; }}
+            </style>
+        </head>
+        <body>
+            <div class=\"container\">
+                <h1>Infrastructure Cost Dashboard</h1>
+                <p>Generated: {datetime.utcnow().strftime(\"%Y-%m-%d %H:%M:%S\")} UTC</p>
+                
+                <div class=\"card\">
+                    <h2>Cost Overview</h2>
+                    <div class=\"metric\">
+                        <div class=\"metric-value\">\${"${{ needs.cost-analysis.outputs.total_cost || 0 }}"}</div>
+                        <div class=\"metric-label\">Monthly Cost</div>
+                    </div>
+                    <div class=\"metric\">
+                        <div class=\"metric-value savings\">\${"${{ needs.cost-analysis.outputs.potential_savings || 0 }}"}</div>
+                        <div class=\"metric-label\">Potential Savings</div>
+                    </div>
+                    <div class=\"metric\">
+                        <div class=\"metric-value\">{"${{ needs.cost-analysis.outputs.recommendations_count || 0 }}"}</div>
+                        <div class=\"metric-label\">Recommendations</div>
+                    </div>
+                </div>
+                
+                <div class=\"card\">
+                    <h2>Optimization Status</h2>
+        '''
+        
+        if 'optimization' in reports:
+            opt = reports['optimization']['summary']
+            html_content += f'''
+                    <div class=\"metric\">
+                        <div class=\"metric-value\">{opt['completed_actions']}</div>
+                        <div class=\"metric-label\">Actions Completed</div>
+                    </div>
+                    <div class=\"metric\">
+                        <div class=\"metric-value error\">{opt['failed_actions']}</div>
+                        <div class=\"metric-label\">Actions Failed</div>
+                    </div>
+                    <div class=\"metric\">
+                        <div class=\"metric-value savings\">\${opt['total_monthly_savings']:,.2f}</div>
+                        <div class=\"metric-label\">Monthly Savings Achieved</div>
+                    </div>
+            '''
+        else:
+            html_content += '<p>No optimization data available</p>'
+        
+        html_content += '''
+                </div>
+                
+                <div class=\"card\">
+                    <h2>Compliance Status</h2>
+        '''
+        
+        if 'compliance' in reports:
+            comp = reports['compliance']
+            compliance_pct = comp['compliance_percentage']
+            status_class = 'status-good' if compliance_pct >= 90 else 'status-warning' if compliance_pct >= 70 else 'status-error'
+            
+            html_content += f'''
+                    <div class=\"{status_class}\">
+                        <strong>Tag Compliance: {compliance_pct:.1f}%</strong><br>
+                        Resources checked: {comp['total_resources_checked']}<br>
+                        Untagged resources: {len(comp['untagged_resources'])}
+                    </div>
+            '''
+        else:
+            html_content += '<p>No compliance data available</p>'
+        
+        html_content += '''
+                </div>
+                
+                <div class=\"card\">
+                    <h2>Next Steps</h2>
+                    <ul>
+        '''
+        
+        # Add recommendations based on data
+        total_cost = float('${{ needs.cost-analysis.outputs.total_cost || 0 }}')
+        potential_savings = float('${{ needs.cost-analysis.outputs.potential_savings || 0 }}')
+        
+        if total_cost > 10000:
+            html_content += '<li class=\"warning\">💰 Monthly cost exceeds $10,000 - consider immediate cost reduction</li>'
+        
+        if potential_savings > 500:
+            html_content += '<li class=\"savings\">💡 High savings potential detected - review optimization recommendations</li>'
+        
+        if 'compliance' in reports and reports['compliance']['compliance_percentage'] < 90:
+            html_content += '<li class=\"error\">🏷️ Improve resource tagging for better cost allocation</li>'
+        
+        html_content += '''
+                        <li>📊 Schedule weekly cost reviews</li>
+                        <li>🔄 Enable automated optimization for low-risk actions</li>
+                        <li>📈 Set up cost alerts and budgets</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        '''
+        
+        with open('cost_dashboard.html', 'w') as f:
+            f.write(html_content)
+        
+        print('Dashboard generated successfully')
+        "
+        
+    - name: Upload dashboard
+      uses: actions/upload-artifact@v3
+      with:
+        name: cost-dashboard
+        path: cost_dashboard.html
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [cost-analysis, resource-optimization, security-and-compliance, generate-dashboard]
+    if: always()
+    
+    steps:
+    - name: Prepare notification data
+      id: notification
+      run: |
+        TOTAL_COST="${{ needs.cost-analysis.outputs.total_cost || 0 }}"
+        POTENTIAL_SAVINGS="${{ needs.cost-analysis.outputs.potential_savings || 0 }}"
+        RECOMMENDATIONS="${{ needs.cost-analysis.outputs.recommendations_count || 0 }}"
+        
+        # Determine alert level
+        if (( $(echo "$TOTAL_COST > 10000" | bc -l) )); then
+          echo "alert_level=critical" >> $GITHUB_OUTPUT
+          echo "alert_color=danger" >> $GITHUB_OUTPUT
+        elif (( $(echo "$POTENTIAL_SAVINGS > 1000" | bc -l) )); then
+          echo "alert_level=warning" >> $GITHUB_OUTPUT
+          echo "alert_color=warning" >> $GITHUB_OUTPUT
+        else
+          echo "alert_level=info" >> $GITHUB_OUTPUT
+          echo "alert_color=good" >> $GITHUB_OUTPUT
+        fi
+        
+        echo "total_cost=$TOTAL_COST" >> $GITHUB_OUTPUT
+        echo "potential_savings=$POTENTIAL_SAVINGS" >> $GITHUB_OUTPUT
+        echo "recommendations=$RECOMMENDATIONS" >> $GITHUB_OUTPUT
+        
+    - name: Send Slack notification
+      if: env.SLACK_WEBHOOK_URL != ''
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      run: |
+        curl -X POST $SLACK_WEBHOOK_URL \
+          -H 'Content-Type: application/json' \
+          -d '{
+            "attachments": [{
+              "color": "${{ steps.notification.outputs.alert_color }}",
+              "title": "💰 Infrastructure Cost Analysis Complete",
+              "fields": [
+                {
+                  "title": "Monthly Cost",
+                  "value": "$$${{ steps.notification.outputs.total_cost }}",
+                  "short": true
+                },
+                {
+                  "title": "Potential Savings",
+                  "value": "$$${{ steps.notification.outputs.potential_savings }}",
+                  "short": true
+                },
+                {
+                  "title": "Recommendations",
+                  "value": "${{ steps.notification.outputs.recommendations }}",
+                  "short": true
+                },
+                {
+                  "title": "Alert Level",
+                  "value": "${{ steps.notification.outputs.alert_level }}",
+                  "short": true
+                }
+              ],
+              "actions": [
+                {
+                  "type": "button",
+                  "text": "View Details",
+                  "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                }
+              ]
+            }]
+          }'
+          
+    - name: Create cost optimization issue
+      if: steps.notification.outputs.alert_level == 'critical' || steps.notification.outputs.potential_savings > 2000
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const title = '💰 High Cost Alert - Immediate Action Required';
+          const body = `# Infrastructure Cost Alert
+          
+          **Alert Level**: ${{ steps.notification.outputs.alert_level }}
+          **Monthly Cost**: $${{ steps.notification.outputs.total_cost }}
+          **Potential Savings**: $${{ steps.notification.outputs.potential_savings }}
+          **Recommendations**: ${{ steps.notification.outputs.recommendations }}
+          
+          ## Action Required
+          - [ ] Review cost analysis report
+          - [ ] Implement high-priority optimizations
+          - [ ] Update budgets and alerts
+          - [ ] Schedule cost review meeting
+          
+          ## Links
+          - [Cost Analysis Workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [Cost Dashboard](Link to be added)
+          
+          ---
+          Generated by Cost Optimization Workflow on ${{ github.run_id }}`;
+          
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: title,
+            body: body,
+            labels: ['cost-optimization', 'high-priority', 'infrastructure']
+          });

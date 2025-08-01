@@ -1,0 +1,5 @@
+backend_store_uri: sqlite:///mlflow.db
+default_artifact_root: mlflow_artifacts
+host: 127.0.0.1
+port: 5000
+workers: 1

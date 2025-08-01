@@ -1,0 +1,463 @@
+# Performance Monitoring and Scaling Configuration
+
+performance_monitoring:
+  # Monitoring settings
+  monitoring:
+    # Collection interval in seconds
+    interval_seconds: 30
+    
+    # Data retention in hours
+    retention_hours: 72
+    
+    # Enable automatic scaling recommendations
+    enable_auto_scaling: true
+    
+    # Enable alert generation
+    enable_alerts: true
+    
+    # Enable anomaly detection  
+    enable_anomaly_detection: true
+    
+    # Metrics buffer size
+    metrics_buffer_size: 1000
+    
+    # Processed metrics buffer size
+    processed_buffer_size: 100
+
+  # Performance thresholds
+  thresholds:
+    # CPU utilization thresholds (%)
+    cpu_utilization_high: 80
+    cpu_utilization_low: 20
+    cpu_utilization_critical: 95
+    
+    # Memory utilization thresholds (%)
+    memory_utilization_high: 85
+    memory_utilization_low: 30
+    memory_utilization_critical: 95
+    
+    # Request latency thresholds (milliseconds)
+    request_latency_high: 2000
+    request_latency_critical: 5000
+    
+    # Error rate thresholds (%)
+    error_rate_high: 5
+    error_rate_critical: 10
+    
+    # Disk I/O thresholds (MB/s)
+    disk_io_high: 1000
+    disk_io_critical: 2000
+    
+    # Network I/O thresholds (MB/s)
+    network_io_high: 500
+    network_io_critical: 1000
+    
+    # Database response time thresholds (ms)
+    database_response_time_high: 100
+    database_response_time_critical: 500
+    
+    # Cache hit rate thresholds (%)
+    cache_hit_rate_low: 80
+    cache_hit_rate_critical: 60
+    
+    # Model inference time thresholds (ms)
+    model_inference_time_high: 1000
+    model_inference_time_critical: 3000
+    
+    # Queue length thresholds
+    queue_length_high: 100
+    queue_length_critical: 500
+    
+    # Throughput thresholds (requests/second)
+    throughput_low: 10
+    throughput_critical: 1
+
+  # Auto-scaling configuration
+  scaling:
+    # Scaling cooldown period (minutes)
+    cooldown_minutes: 5
+    
+    # Scale up threshold (%)
+    scale_up_threshold: 80
+    
+    # Scale down threshold (%)
+    scale_down_threshold: 30
+    
+    # Maximum instances
+    max_instances: 20
+    
+    # Minimum instances
+    min_instances: 2
+    
+    # Resource limits per instance
+    resource_limits:
+      cpu: "1000m"          # 1 CPU core
+      memory: "2Gi"         # 2GB RAM
+      
+    # Resource requests per instance
+    resource_requests:
+      cpu: "500m"           # 0.5 CPU core
+      memory: "1Gi"         # 1GB RAM
+    
+    # Scaling policies
+    policies:
+      cpu_based:
+        enabled: true
+        target_utilization: 70
+        scale_up_threshold: 80
+        scale_down_threshold: 30
+        
+      memory_based:
+        enabled: true
+        target_utilization: 75
+        scale_up_threshold: 85
+        scale_down_threshold: 40
+        
+      request_rate_based:
+        enabled: true
+        target_requests_per_second: 100
+        scale_up_threshold: 150
+        scale_down_threshold: 50
+        
+      queue_length_based:
+        enabled: true
+        target_queue_length: 10
+        scale_up_threshold: 20
+        scale_down_threshold: 5
+
+  # Component-specific monitoring
+  components:
+    api_server:
+      enabled: true
+      metrics_endpoint: "http://localhost:8000/metrics"
+      health_endpoint: "http://localhost:8000/health"
+      expected_response_time_ms: 200
+      
+    model_server:
+      enabled: true
+      metrics_endpoint: "http://localhost:8001/metrics"
+      expected_inference_time_ms: 500
+      
+    database:
+      redis:
+        enabled: true
+        host: "localhost"
+        port: 6379
+        monitor_memory: true
+        monitor_connections: true
+        monitor_hit_rate: true
+        
+    kubernetes:
+      enabled: true
+      namespace: "drugban"
+      monitor_pods: true
+      monitor_nodes: true
+      monitor_resource_usage: true
+      
+    batch_processing:
+      enabled: true
+      queue_name: "model_training"
+      monitor_queue_length: true
+      monitor_processing_time: true
+
+  # Alert configuration
+  alerting:
+    # Alert rules
+    rules:
+      high_cpu:
+        metric: cpu_utilization
+        threshold: 80
+        duration_minutes: 5
+        severity: warning
+        
+      critical_cpu:
+        metric: cpu_utilization
+        threshold: 95
+        duration_minutes: 2
+        severity: critical
+        
+      high_memory:
+        metric: memory_utilization
+        threshold: 85
+        duration_minutes: 5
+        severity: warning
+        
+      critical_memory:
+        metric: memory_utilization
+        threshold: 95
+        duration_minutes: 2
+        severity: critical
+        
+      high_latency:
+        metric: request_latency
+        threshold: 2000
+        duration_minutes: 3
+        severity: warning
+        
+      critical_latency:
+        metric: request_latency
+        threshold: 5000
+        duration_minutes: 1
+        severity: critical
+        
+      high_error_rate:
+        metric: error_rate
+        threshold: 5
+        duration_minutes: 2
+        severity: warning
+        
+      low_cache_hit_rate:
+        metric: cache_hit_rate
+        threshold: 80
+        duration_minutes: 10
+        severity: warning
+        operator: "less_than"
+        
+    # Alert channels
+    channels:
+      slack:
+        enabled: true
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#performance-alerts"
+        mention_users:
+          - "@devops-team"
+          - "@ml-engineers"
+          
+      email:
+        enabled: true
+        smtp_server: "${SMTP_SERVER}"
+        smtp_port: 587
+        username: "${SMTP_USERNAME}"
+        password: "${SMTP_PASSWORD}"
+        recipients:
+          - devops@company.com
+          - mlops@company.com
+          
+      pagerduty:
+        enabled: false
+        api_key: "${PAGERDUTY_API_KEY}"
+        service_key: "${PAGERDUTY_SERVICE_KEY}"
+        
+    # Alert suppression
+    suppression:
+      # Suppress duplicate alerts within time window
+      duplicate_suppression_minutes: 30
+      
+      # Group related alerts
+      group_alerts: true
+      grouping_window_minutes: 5
+
+  # Anomaly detection
+  anomaly_detection:
+    enabled: true
+    
+    # Detection methods
+    methods:
+      statistical:
+        enabled: true
+        window_size: 20
+        std_deviation_threshold: 2.5
+        
+      machine_learning:
+        enabled: false
+        model_type: "isolation_forest"
+        training_window_hours: 24
+        contamination_rate: 0.1
+        
+    # Anomaly alert settings
+    alert_on_anomalies: true
+    anomaly_alert_severity: "warning"
+
+  # Performance optimization
+  optimization:
+    # CPU optimization
+    cpu:
+      enable_frequency_scaling: true
+      enable_cpu_affinity: true
+      preferred_cpu_cores: [0, 1, 2, 3]
+      
+    # Memory optimization  
+    memory:
+      enable_memory_compaction: true
+      enable_swap_optimization: true
+      memory_limit_buffer_percent: 10
+      
+    # I/O optimization
+    io:
+      enable_io_scheduling: true
+      io_scheduler: "deadline"
+      read_ahead_kb: 256
+      
+    # Network optimization
+    network:
+      enable_tcp_optimization: true
+      tcp_congestion_control: "bbr"
+      socket_buffer_size: "16777216"
+      
+    # Application-specific optimizations
+    application:
+      # Model serving optimizations
+      model_serving:
+        enable_model_caching: true
+        batch_inference: true
+        batch_size: 32
+        batch_timeout_ms: 100
+        
+      # Database optimizations
+      database:
+        redis_maxmemory_policy: "allkeys-lru"
+        redis_tcp_keepalive: 300
+        connection_pool_size: 20
+
+  # Load testing configuration
+  load_testing:
+    enabled: true
+    
+    # Test scenarios
+    scenarios:
+      normal_load:
+        requests_per_second: 50
+        duration_minutes: 10
+        ramp_up_minutes: 2
+        
+      peak_load:
+        requests_per_second: 200
+        duration_minutes: 5
+        ramp_up_minutes: 1
+        
+      stress_test:
+        requests_per_second: 500
+        duration_minutes: 2
+        ramp_up_minutes: 0.5
+        
+    # Test endpoints
+    endpoints:
+      - path: "/predict"
+        method: "POST"
+        weight: 70
+        
+      - path: "/health"
+        method: "GET" 
+        weight: 20
+        
+      - path: "/metrics"
+        method: "GET"
+        weight: 10
+        
+    # Performance targets
+    targets:
+      response_time_p95_ms: 1000
+      response_time_p99_ms: 2000
+      error_rate_percent: 1
+      throughput_rps: 100
+
+  # Capacity planning
+  capacity_planning:
+    enabled: true
+    
+    # Forecasting
+    forecasting:
+      enabled: true
+      forecast_horizon_days: 30
+      confidence_level: 0.95
+      
+    # Growth modeling
+    growth_modeling:
+      expected_growth_rate_monthly: 0.15  # 15% monthly growth
+      seasonal_factors:
+        january: 0.9
+        february: 0.9
+        march: 1.0
+        april: 1.1
+        may: 1.1
+        june: 1.2
+        july: 1.2
+        august: 1.1
+        september: 1.0
+        october: 1.0
+        november: 1.1
+        december: 1.2
+        
+    # Resource planning
+    resource_planning:
+      target_utilization: 70  # Target 70% utilization
+      buffer_percentage: 20   # 20% buffer for spikes
+      planning_horizon_months: 6
+
+  # Reporting
+  reporting:
+    # Report generation
+    enabled: true
+    schedule: "0 8 * * 1"  # Every Monday at 8 AM
+    
+    # Report types
+    report_types:
+      - performance_summary
+      - scaling_recommendations
+      - capacity_forecast
+      - alert_summary
+      - optimization_opportunities
+      
+    # Report formats
+    formats:
+      - html
+      - pdf
+      - json
+      
+    # Report distribution
+    distribution:
+      email_recipients:
+        - performance-team@company.com
+        - management@company.com
+        
+      storage_location: "reports/performance/"
+      retention_days: 90
+      
+    # Dashboard settings
+    dashboard:
+      enabled: true
+      refresh_interval_seconds: 30
+      auto_refresh: true
+      
+  # Integration settings
+  integrations:
+    # Prometheus integration
+    prometheus:
+      enabled: true
+      endpoint: "http://localhost:9090"
+      push_gateway: "http://localhost:9091"
+      job_name: "mlops-performance"
+      
+    # Grafana integration
+    grafana:
+      enabled: true
+      endpoint: "http://localhost:3000"
+      api_key: "${GRAFANA_API_KEY}"
+      dashboard_id: "mlops-performance"
+      
+    # MLflow integration
+    mlflow:
+      enabled: true
+      tracking_uri: "${MLFLOW_TRACKING_URI}"
+      log_performance_metrics: true
+      experiment_name: "performance_monitoring"
+      
+    # AWS CloudWatch integration
+    cloudwatch:
+      enabled: false
+      region: "us-east-1"
+      namespace: "MLOps/Performance"
+      
+  # Security and compliance
+  security:
+    # Encrypt metrics in transit
+    encrypt_metrics: true
+    
+    # Authentication for metrics endpoints
+    require_authentication: true
+    
+    # Audit logging
+    audit_logging:
+      enabled: true
+      log_level: "INFO"
+      retention_days: 365

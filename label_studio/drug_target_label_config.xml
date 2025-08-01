@@ -1,0 +1,69 @@
+<View>
+      <Header value="Drug-Target Interaction Annotation"/>
+      
+      <!-- Drug Information -->
+      <View style="background-color: #f0f8ff; padding: 10px; margin: 10px 0; border-radius: 5px;">
+        <Header value="Drug Information"/>
+        <Text name="drug_id" value="$drug_id" style="font-weight: bold;"/>
+        <Text name="drug_name" value="$drug_name"/>
+        <Text name="smiles" value="$smiles" style="font-family: monospace; font-size: 12px;"/>
+        <Text name="molecular_weight" value="Molecular Weight: $molecular_weight"/>
+        <Text name="logp" value="LogP: $logp"/>
+      </View>
+      
+      <!-- Target Information -->
+      <View style="background-color: #f0fff0; padding: 10px; margin: 10px 0; border-radius: 5px;">
+        <Header value="Target Information"/>
+        <Text name="target_id" value="$target_id" style="font-weight: bold;"/>
+        <Text name="target_name" value="$target_name"/>
+        <Text name="uniprot_id" value="UniProt ID: $uniprot_id"/>
+        <Text name="organism" value="Organism: $organism"/>
+        <Text name="target_class" value="Class: $target_class"/>
+      </View>
+      
+      <!-- Interaction Annotation -->
+      <View style="background-color: #fff8f0; padding: 10px; margin: 10px 0; border-radius: 5px;">
+        <Header value="Interaction Annotation"/>
+        
+        <!-- Interaction Type -->
+        <Choices name="interaction_type" toName="drug_id" choice="single-radio" showInLine="true">
+          <Header value="Interaction Type"/>
+          <Choice value="binding" background="#4CAF50"/>
+          <Choice value="inhibition" background="#FF9800"/>
+          <Choice value="activation" background="#2196F3"/>
+          <Choice value="modulation" background="#9C27B0"/>
+          <Choice value="unknown" background="#757575"/>
+        </Choices>
+        
+        <!-- Confidence Level -->
+        <Rating name="confidence" toName="drug_id" maxRating="5" icon="star" size="medium" defaultValue="3">
+          <Header value="Confidence Level (1-5 stars)"/>
+        </Rating>
+        
+        <!-- Binding Affinity -->
+        <Number name="binding_affinity" toName="drug_id" min="0" max="15" step="0.1" defaultValue="5.0">
+          <Header value="Binding Affinity (pKd/pIC50)"/>
+        </Number>
+        
+        <!-- Evidence Quality -->
+        <Choices name="evidence_quality" toName="drug_id" choice="single-radio" showInLine="true">
+          <Header value="Evidence Quality"/>
+          <Choice value="high" background="#4CAF50"/>
+          <Choice value="medium" background="#FF9800"/>
+          <Choice value="low" background="#F44336"/>
+          <Choice value="predicted" background="#9E9E9E"/>
+        </Choices>
+        
+        <!-- Additional Notes -->
+        <TextArea name="notes" toName="drug_id" placeholder="Additional notes about this interaction..." rows="3"/>
+        
+        <!-- Validation Flags -->
+        <Choices name="validation_flags" toName="drug_id" choice="multiple" showInLine="true">
+          <Header value="Validation Flags"/>
+          <Choice value="reviewed" background="#4CAF50"/>
+          <Choice value="needs_verification" background="#FF9800"/>
+          <Choice value="conflicting_data" background="#F44336"/>
+          <Choice value="novel_interaction" background="#2196F3"/>
+        </Choices>
+      </View>
+    </View>

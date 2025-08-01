@@ -1,0 +1,210 @@
+# Dependency Update Configuration
+
+dependency_updates:
+  # Update strategy
+  update_strategy: minor  # patch, minor, major, security, stable
+  
+  # Automatic updates
+  auto_update:
+    enabled: true
+    schedule: "0 2 * * 1"  # Every Monday at 2 AM
+    auto_merge: false      # Automatically merge updates (requires CI/CD)
+    create_pr: true        # Create pull request for updates
+    
+  # Security settings
+  security:
+    check_vulnerabilities: true
+    vulnerability_sources:
+      - osv          # Open Source Vulnerabilities
+      - nvd          # National Vulnerability Database
+      - ghsa         # GitHub Security Advisory
+    critical_action: alert  # alert, update, block
+    auto_patch_security: true
+    
+  # Testing configuration
+  testing:
+    run_tests: true
+    test_command: "python -m pytest"
+    additional_checks:
+      - "python -m mypy scripts/"
+      - "python -m flake8 scripts/"
+      - "python -m black --check ."
+    rollback_on_failure: true
+    test_timeout: 1800  # 30 minutes
+    
+  # Backup settings
+  backup:
+    enabled: true
+    retention_days: 30
+    backup_location: ".dependency_backups"
+    
+  # Update rules
+  rules:
+    # Packages to exclude from updates
+    excluded_packages:
+      - numpy          # ML models depend on specific version
+      - tensorflow     # Major updates may break compatibility
+      
+    # Packages with pinned versions
+    pinned_packages:
+      torch: "2.0.1"   # Specific version for model compatibility
+      scikit-learn: "1.3.0"
+      
+    # Custom update rules
+    custom_rules:
+      - package: pandas
+        strategy: minor  # Only minor updates for pandas
+      - package: requests
+        strategy: patch  # Only patch updates for requests
+      - package: "*-dev"
+        strategy: major  # Dev dependencies can have major updates
+        
+  # Dependency groups
+  groups:
+    core:
+      - numpy
+      - pandas
+      - scikit-learn
+      - torch
+      - mlflow
+    dev:
+      - pytest
+      - black
+      - flake8
+      - mypy
+    api:
+      - fastapi
+      - uvicorn
+      - pydantic
+      - redis
+    data:
+      - dvc
+      - great-expectations
+      - pyarrow
+      
+  # Update priorities
+  priorities:
+    security: critical   # Always update security issues
+    core: high          # Core dependencies are high priority
+    dev: low           # Dev dependencies are low priority
+    api: medium        # API dependencies are medium priority
+    
+  # Notification settings
+  notifications:
+    enabled: true
+    channels:
+      slack:
+        webhook_url: "${SLACK_WEBHOOK_URL}"
+        notify_on:
+          - security_vulnerabilities
+          - update_failures
+          - major_updates
+      email:
+        smtp_server: "${SMTP_SERVER}"
+        recipients:
+          - mlops-team@company.com
+        notify_on:
+          - security_vulnerabilities
+          - monthly_summary
+          
+  # CI/CD integration
+  ci_integration:
+    enabled: true
+    create_branch: "deps/automated-update-{timestamp}"
+    commit_message: "chore(deps): automated dependency updates"
+    pr_title: "Automated Dependency Updates - {date}"
+    pr_body_template: |
+      ## Automated Dependency Updates
+      
+      This PR contains automated dependency updates performed on {date}.
+      
+      ### Updates Summary
+      {update_summary}
+      
+      ### Security Fixes
+      {security_fixes}
+      
+      ### Test Results
+      {test_results}
+      
+      ### Checklist
+      - [ ] All tests pass
+      - [ ] No breaking changes identified
+      - [ ] Security vulnerabilities addressed
+      - [ ] Documentation updated if needed
+      
+    pr_labels:
+      - dependencies
+      - automated
+      
+  # Dependency sources
+  sources:
+    python:
+      - pypi
+      - conda-forge
+      - private-pypi: "${PRIVATE_PYPI_URL}"
+    npm:
+      - npm
+      - private-npm: "${PRIVATE_NPM_REGISTRY}"
+    docker:
+      - docker-hub
+      - gcr.io
+      - private-registry: "${PRIVATE_DOCKER_REGISTRY}"
+      
+  # Version constraints
+  version_constraints:
+    # Don't update to pre-release versions unless specified
+    allow_prerelease: false
+    
+    # Respect version constraints in requirements
+    respect_constraints: true
+    
+    # Maximum version jumps
+    max_major_jump: 1  # Don't jump more than 1 major version
+    max_minor_jump: 5  # Don't jump more than 5 minor versions
+    
+  # Performance optimization
+  performance:
+    parallel_checks: true
+    max_workers: 4
+    cache_duration: 3600  # Cache dependency info for 1 hour
+    
+  # Reporting
+  reporting:
+    generate_reports: true
+    report_format: json  # json, html, markdown
+    report_location: "reports/dependency_updates/"
+    include_sections:
+      - summary
+      - security_vulnerabilities
+      - update_details
+      - test_results
+      - rollback_info
+    dependency_graph: true
+    
+  # Advanced features
+  advanced:
+    # License compatibility checking
+    check_licenses: true
+    allowed_licenses:
+      - MIT
+      - Apache-2.0
+      - BSD-3-Clause
+      - BSD-2-Clause
+      - ISC
+      - Python-2.0
+    
+    # Size analysis
+    check_size_increase: true
+    max_size_increase_percent: 20
+    
+    # Breaking change detection
+    detect_breaking_changes: true
+    breaking_change_patterns:
+      - "BREAKING"
+      - "breaking change"
+      - "incompatible"
+      
+    # Dependency conflict resolution
+    resolve_conflicts: true
+    conflict_strategy: newest  # newest, oldest, manual

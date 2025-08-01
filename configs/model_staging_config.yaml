@@ -1,0 +1,411 @@
+# Model Staging and Lifecycle Management Configuration
+# Configuration for model staging, promotion, and lifecycle management
+
+# Staging rules and requirements
+staging_rules:
+  # Approval requirements by stage
+  require_approval:
+    none: false                   # No approval needed
+    staging: false                # Auto-approve staging transitions
+    production: true              # Manual approval required for production
+    archived: false               # No approval needed for archival
+  
+  # Validation requirements by stage
+  validation_required:
+    none: false
+    staging: true                 # Validate before staging
+    production: true              # Validate before production
+    archived: false               # No validation for archival
+  
+  # Performance thresholds for each stage
+  performance_thresholds:
+    staging:
+      min_accuracy: 0.70          # 70% minimum accuracy for staging
+      min_auc: 0.75               # 75% minimum AUC for staging
+      min_precision: 0.65         # 65% minimum precision
+      min_recall: 0.65            # 65% minimum recall
+      min_f1_score: 0.65          # 65% minimum F1 score
+      max_inference_time_ms: 2000 # 2 seconds max inference time
+      min_calibration_score: 0.70 # 70% minimum calibration
+    
+    production:
+      min_accuracy: 0.85          # 85% minimum accuracy for production
+      min_auc: 0.90               # 90% minimum AUC for production
+      min_precision: 0.80         # 80% minimum precision
+      min_recall: 0.80            # 80% minimum recall
+      min_f1_score: 0.80          # 80% minimum F1 score
+      max_inference_time_ms: 1000 # 1 second max inference time
+      min_calibration_score: 0.85 # 85% minimum calibration
+
+# Deployment configuration by stage
+deployment_config:
+  # Staging deployment settings
+  staging:
+    environment: "staging"
+    namespace: "drugban-staging"
+    replicas: 1                   # Single replica for staging
+    auto_deploy: true             # Automatically deploy to staging
+    blue_green: false             # No blue-green for staging
+    
+    # Resource allocation
+    resources:
+      requests:
+        cpu: "500m"               # 0.5 CPU cores
+        memory: "1Gi"             # 1GB memory
+      limits:
+        cpu: "1000m"              # 1 CPU core limit
+        memory: "2Gi"             # 2GB memory limit
+    
+    # Health checks
+    health_checks:
+      liveness_probe:
+        initial_delay_seconds: 30
+        period_seconds: 30
+        timeout_seconds: 10
+        failure_threshold: 3
+      readiness_probe:
+        initial_delay_seconds: 15
+        period_seconds: 10
+        timeout_seconds: 5
+        failure_threshold: 2
+    
+    # Traffic configuration
+    traffic:
+      external_access: true
+      load_balancer_type: "ClusterIP"
+      port: 8000
+      
+  # Production deployment settings
+  production:
+    environment: "production"
+    namespace: "drugban-prod"
+    replicas: 3                   # Multiple replicas for HA
+    auto_deploy: false            # Manual deployment approval
+    blue_green: true              # Blue-green deployment strategy
+    canary: false                 # Option for canary deployments
+    
+    # Resource allocation
+    resources:
+      requests:
+        cpu: "1000m"              # 1 CPU core
+        memory: "2Gi"             # 2GB memory
+      limits:
+        cpu: "2000m"              # 2 CPU cores limit
+        memory: "4Gi"             # 4GB memory limit
+    
+    # Health checks
+    health_checks:
+      liveness_probe:
+        initial_delay_seconds: 60
+        period_seconds: 15
+        timeout_seconds: 10
+        failure_threshold: 3
+      readiness_probe:
+        initial_delay_seconds: 30
+        period_seconds: 5
+        timeout_seconds: 5
+        failure_threshold: 2
+    
+    # Traffic configuration
+    traffic:
+      external_access: true
+      load_balancer_type: "LoadBalancer"
+      port: 8000
+      ssl_enabled: true
+      
+    # Deployment strategy
+    deployment_strategy:
+      type: "blue_green"          # Blue-green deployment
+      max_unavailable: 0          # Zero downtime
+      max_surge: 1                # One additional pod during deployment
+      rollback_on_failure: true   # Automatic rollback on failure
+
+# Model validation configuration
+validation_config:
+  # Test datasets for validation
+  test_datasets:
+    staging: "data/validation/"   # Validation dataset for staging
+    production: "data/test/"      # Test dataset for production
+    holdout: "data/holdout/"      # Holdout dataset for final validation
+  
+  # Validation metrics to check
+  validation_metrics:
+    - "accuracy"
+    - "auc"
+    - "precision" 
+    - "recall"
+    - "f1_score"
+    - "mcc"                       # Matthews Correlation Coefficient
+    - "calibration_score"
+  
+  # Model comparison settings
+  benchmark_comparison: true      # Compare with current production model
+  performance_regression_threshold: 0.05  # 5% regression threshold
+  statistical_significance_test: true     # Require statistical significance
+  confidence_level: 0.95         # 95% confidence level
+  
+  # Advanced validation features
+  fairness_validation:
+    enabled: true
+    protected_attributes: ["age_group", "gender"]
+    fairness_threshold: 0.1       # 10% fairness threshold
+  
+  robustness_testing:
+    enabled: true
+    perturbation_tests:
+      - "gaussian_noise"
+      - "feature_dropout"
+    robustness_threshold: 0.9     # 90% robustness threshold
+  
+  # Validation timeouts
+  validation_timeout_minutes: 30  # Maximum validation time
+  validation_retry_attempts: 3    # Retry attempts on failure
+
+# Approval workflow configuration
+approval_workflow:
+  # Production approvers
+  production_approvers:
+    - "model-admin"
+    - "ml-ops-lead"
+    - "data-science-lead"
+    - "product-owner"
+  
+  # Approval settings
+  approval_timeout_hours: 72      # 72 hours to approve/reject
+  require_multiple_approvals: true # Require multiple approvers
+  min_approvers: 2                # Minimum 2 approvers required
+  
+  # Emergency procedures
+  emergency_deployment:
+    enabled: true
+    emergency_approvers:
+      - "cto"
+      - "head-of-engineering"
+    emergency_timeout_hours: 4    # 4 hours for emergency approval
+    emergency_criteria:
+      - "security_vulnerability"
+      - "critical_bug_fix"
+      - "regulatory_compliance"
+  
+  # Automatic rollback conditions
+  rollback_conditions:
+    performance_degradation: 0.10  # 10% performance drop
+    error_rate_increase: 0.05      # 5% error rate increase  
+    latency_increase: 0.50         # 50% latency increase
+    memory_increase: 0.75          # 75% memory increase
+    cpu_increase: 1.0              # 100% CPU increase
+  
+  # Rollback settings
+  automatic_rollback: true        # Enable automatic rollback
+  rollback_timeout_minutes: 15    # 15 minutes to rollback
+  rollback_notification: true     # Notify on rollback
+  
+  # Notification settings
+  notifications:
+    approval_request:
+      channels: ["slack", "email"]
+      urgency: "normal"
+    approval_granted:
+      channels: ["slack"]
+      urgency: "low"
+    approval_rejected:
+      channels: ["slack", "email"]
+      urgency: "normal"
+    emergency_deployment:
+      channels: ["slack", "email", "sms"]
+      urgency: "high"
+
+# Model archival policy
+archival_policy:
+  # Automatic archival settings
+  auto_archive_enabled: true
+  auto_archive_after_days: 90     # Archive models older than 90 days
+  
+  # Version retention
+  keep_n_versions: 5              # Keep latest 5 versions per stage
+  keep_production_versions: 10    # Keep more production versions
+  
+  # Performance-based archival
+  archive_performance_threshold: 0.60  # Archive models with accuracy < 60%
+  archive_unused_days: 30         # Archive unused models after 30 days
+  
+  # Manual archival settings
+  require_archival_reason: true   # Require reason for manual archival
+  archival_approval_required: false  # No approval needed for archival
+  
+  # Data retention
+  data_retention_days: 365        # Keep archived model data for 1 year
+  metadata_retention_days: 2555   # Keep metadata for 7 years (compliance)
+  
+  # Cleanup policies
+  cleanup_artifacts: true         # Clean up model artifacts on archival
+  cleanup_deployments: true       # Clean up deployments on archival
+  cleanup_monitoring: true        # Clean up monitoring on archival
+
+# Model registry integration
+model_registry:
+  # MLflow configuration
+  mlflow:
+    tracking_uri: "${MLFLOW_TRACKING_URI:-http://localhost:5000}"
+    experiment_prefix: "drugban"
+    model_name_prefix: "drugban"
+    
+    # Model metadata
+    required_tags:
+      - "model_type"
+      - "training_dataset"
+      - "model_version"
+      - "created_by"
+    
+    # Model artifacts
+    artifact_location: "${MLFLOW_ARTIFACT_ROOT:-mlflow_artifacts}"
+    log_model_artifacts: true
+    log_training_metrics: true
+  
+  # Model versioning
+  versioning:
+    semantic_versioning: true      # Use semantic versioning (major.minor.patch)
+    auto_increment: true           # Auto-increment version numbers
+    version_tags: true             # Tag versions with metadata
+  
+  # Model lineage
+  lineage_tracking:
+    enabled: true
+    track_data_lineage: true       # Track data dependencies
+    track_code_lineage: true       # Track code dependencies
+    track_parent_models: true      # Track parent/child relationships
+
+# Monitoring and observability
+monitoring:
+  # Model performance monitoring
+  performance_monitoring:
+    enabled: true
+    check_interval_minutes: 15     # Check every 15 minutes
+    metrics_retention_days: 90     # Keep metrics for 90 days
+    
+    # Performance alerts
+    alerts:
+      accuracy_drop: 0.05          # Alert on 5% accuracy drop
+      latency_increase: 0.25       # Alert on 25% latency increase
+      error_rate_increase: 0.02    # Alert on 2% error rate increase
+      memory_increase: 0.50        # Alert on 50% memory increase
+  
+  # Health monitoring
+  health_monitoring:
+    enabled: true
+    health_check_interval_seconds: 30
+    health_check_timeout_seconds: 10
+    consecutive_failures_threshold: 3
+  
+  # Prometheus integration
+  prometheus:
+    enabled: true
+    metrics_port: 8080
+    metrics_path: "/metrics"
+    
+    # Custom metrics
+    custom_metrics:
+      - name: "model_stage_transitions_total"
+        type: "counter"
+        help: "Total model stage transitions"
+        labels: ["model_name", "from_stage", "to_stage"]
+      
+      - name: "model_validation_score"
+        type: "gauge"
+        help: "Model validation score"
+        labels: ["model_name", "version", "target_stage"]
+      
+      - name: "deployment_duration_seconds"
+        type: "histogram"
+        help: "Model deployment duration"
+        labels: ["model_name", "version", "stage"]
+        buckets: [30, 60, 120, 300, 600, 1200]
+
+# Security and compliance
+security:
+  # Access control
+  access_control:
+    enabled: true
+    rbac_enabled: true            # Role-based access control
+    
+    # Role definitions
+    roles:
+      model_viewer:
+        permissions: ["list_models", "view_model_details"]
+      model_developer:
+        permissions: ["list_models", "view_model_details", "transition_to_staging"]
+      model_admin:
+        permissions: ["*"]
+      production_deployer:
+        permissions: ["list_models", "view_model_details", "transition_to_production", "rollback"]
+  
+  # Audit logging
+  audit_logging:
+    enabled: true
+    log_all_actions: true
+    log_retention_days: 2555      # 7 years for compliance
+    sensitive_data_masking: true
+  
+  # Compliance
+  compliance:
+    fda_21_cfr_part_11: true      # FDA 21 CFR Part 11 compliance
+    gdpr_compliance: true         # GDPR compliance
+    soc2_compliance: true         # SOC 2 compliance
+    
+    # Validation documentation
+    validation_documentation: true
+    change_control: true
+    electronic_signatures: true
+
+# Environment-specific overrides
+environments:
+  development:
+    staging_rules:
+      require_approval:
+        staging: false
+        production: false         # No approval in dev
+    deployment_config:
+      staging:
+        replicas: 1
+        auto_deploy: true
+      production:
+        replicas: 1               # Single replica in dev
+        auto_deploy: true
+    monitoring:
+      performance_monitoring:
+        check_interval_minutes: 60 # Less frequent monitoring
+  
+  staging:
+    staging_rules:
+      performance_thresholds:
+        production:
+          min_accuracy: 0.80      # Lower thresholds in staging
+          min_auc: 0.85
+    approval_workflow:
+      approval_timeout_hours: 24  # Faster approval in staging
+  
+  production:
+    security:
+      access_control:
+        rbac_enabled: true
+      audit_logging:
+        log_all_actions: true
+    monitoring:
+      performance_monitoring:
+        check_interval_minutes: 5  # More frequent monitoring
+      health_monitoring:
+        health_check_interval_seconds: 15
+
+# Feature flags
+feature_flags:
+  # Experimental features
+  enable_canary_deployments: false
+  enable_automated_rollback: true
+  enable_performance_prediction: false
+  enable_model_explanation_validation: false
+  
+  # Advanced features  
+  enable_multi_model_comparison: true
+  enable_a_b_testing_integration: true
+  enable_shadow_deployments: false
+  enable_gradual_rollout: false

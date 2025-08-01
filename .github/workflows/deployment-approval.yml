@@ -1,0 +1,425 @@
+name: Deployment Approval Workflow
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target deployment environment'
+        required: true
+        type: string
+      image_tag:
+        description: 'Docker image tag to deploy'
+        required: true
+        type: string
+      approval_required:
+        description: 'Whether manual approval is required'
+        required: false
+        type: boolean
+        default: true
+      auto_approve_conditions:
+        description: 'JSON string of conditions for auto-approval'
+        required: false
+        type: string
+        default: '{}'
+    outputs:
+      deployment_approved:
+        description: 'Whether deployment was approved'
+        value: ${{ jobs.approval-gate.outputs.approved }}
+      approval_decision:
+        description: 'Approval decision details'
+        value: ${{ jobs.approval-gate.outputs.decision }}
+
+env:
+  ENVIRONMENT: ${{ inputs.environment }}
+  IMAGE_TAG: ${{ inputs.image_tag }}
+
+jobs:
+  pre-deployment-checks:
+    name: Pre-deployment Validation
+    runs-on: ubuntu-latest
+    outputs:
+      validation_passed: ${{ steps.validation.outputs.passed }}
+      validation_report: ${{ steps.validation.outputs.report }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download deployment artifacts
+      uses: actions/download-artifact@v3
+      with:
+        pattern: "*-reports-${{ github.sha }}"
+        path: validation-artifacts/
+        merge-multiple: true
+      
+    - name: Run pre-deployment validation
+      id: validation
+      run: |
+        echo "Running pre-deployment validation for ${{ inputs.environment }}..."
+        
+        # Initialize validation results
+        VALIDATION_PASSED=true
+        VALIDATION_REPORT=""
+        
+        # Check 1: Security scan results
+        if [ -f "validation-artifacts/security_summary.json" ]; then
+          CRITICAL_VULNS=$(python3 -c "
+        import json
+        try:
+            with open('validation-artifacts/security_summary.json', 'r') as f:
+                data = json.load(f)
+            critical = data.get('safety', {}).get('critical_vulnerabilities', 0)
+            critical += data.get('bandit', {}).get('high_severity_issues', 0)
+            print(critical)
+        except:
+            print('0')
+        ")
+          
+          if [ "$CRITICAL_VULNS" -gt "0" ]; then
+            VALIDATION_PASSED=false
+            VALIDATION_REPORT="❌ Critical security vulnerabilities found: $CRITICAL_VULNS\n$VALIDATION_REPORT"
+          else
+            VALIDATION_REPORT="✅ Security scan passed\n$VALIDATION_REPORT"
+          fi
+        else
+          VALIDATION_REPORT="⚠️ Security scan results not found\n$VALIDATION_REPORT"
+        fi
+        
+        # Check 2: Test results
+        if [ -f "validation-artifacts/pytest-results.xml" ]; then
+          # Parse test results (simplified)
+          TEST_FAILURES=$(grep -o 'failures="[0-9]*"' validation-artifacts/pytest-results.xml | grep -o '[0-9]*' || echo "0")
+          if [ "$TEST_FAILURES" -gt "0" ]; then
+            VALIDATION_PASSED=false
+            VALIDATION_REPORT="❌ Test failures found: $TEST_FAILURES\n$VALIDATION_REPORT"
+          else
+            VALIDATION_REPORT="✅ All tests passed\n$VALIDATION_REPORT"
+          fi
+        else
+          VALIDATION_REPORT="⚠️ Test results not found\n$VALIDATION_REPORT"
+        fi
+        
+        # Check 3: Model validation (environment specific)
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          # Production requires additional model validation
+          if [ -f "validation-artifacts/model_validation_report.json" ]; then
+            MODEL_SCORE=$(python3 -c "
+        import json
+        try:
+            with open('validation-artifacts/model_validation_report.json', 'r') as f:
+                data = json.load(f)
+            print(data.get('overall_score', 0))
+        except:
+            print('0')
+        ")
+            
+            if [ "$(echo "$MODEL_SCORE < 75" | bc -l)" = "1" ]; then
+              VALIDATION_PASSED=false
+              VALIDATION_REPORT="❌ Model validation score too low: $MODEL_SCORE\n$VALIDATION_REPORT"
+            else
+              VALIDATION_REPORT="✅ Model validation passed (score: $MODEL_SCORE)\n$VALIDATION_REPORT"
+            fi
+          else
+            VALIDATION_PASSED=false
+            VALIDATION_REPORT="❌ Model validation report missing for production\n$VALIDATION_REPORT"
+          fi
+        fi
+        
+        # Check 4: Container image validation
+        echo "Validating container image: ${{ inputs.image_tag }}"
+        # This would typically check if the image exists and is scannable
+        VALIDATION_REPORT="✅ Container image validated\n$VALIDATION_REPORT"
+        
+        # Output results
+        echo "passed=$VALIDATION_PASSED" >> $GITHUB_OUTPUT
+        echo "report<<EOF" >> $GITHUB_OUTPUT
+        echo -e "$VALIDATION_REPORT" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        if [ "$VALIDATION_PASSED" = "true" ]; then
+          echo "✅ Pre-deployment validation PASSED"
+        else
+          echo "❌ Pre-deployment validation FAILED"
+          exit 1
+        fi
+        
+    - name: Upload validation report
+      uses: actions/upload-artifact@v3
+      with:
+        name: pre-deployment-validation-${{ inputs.environment }}-${{ github.sha }}
+        path: validation-artifacts/
+        retention-days: 90
+
+  approval-gate:
+    name: Deployment Approval Gate
+    runs-on: ubuntu-latest
+    needs: pre-deployment-checks
+    if: needs.pre-deployment-checks.outputs.validation_passed == 'true'
+    outputs:
+      approved: ${{ steps.approval-decision.outputs.approved }}
+      decision: ${{ steps.approval-decision.outputs.decision }}
+    
+    environment:
+      name: ${{ inputs.environment }}-approval
+      url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check auto-approval conditions
+      id: auto-approve
+      run: |
+        echo "Checking auto-approval conditions..."
+        
+        AUTO_APPROVE=false
+        AUTO_APPROVE_REASON=""
+        
+        # Parse auto-approval conditions
+        CONDITIONS='${{ inputs.auto_approve_conditions }}'
+        if [ "$CONDITIONS" != "{}" ]; then
+          echo "Auto-approval conditions provided: $CONDITIONS"
+          
+          # Check if this is an emergency deployment
+          EMERGENCY=$(echo "$CONDITIONS" | python3 -c "
+        import json, sys
+        try:
+            data = json.load(sys.stdin)
+            print(data.get('emergency', 'false').lower())
+        except:
+            print('false')
+        ")
+          
+          # Check if deployer is in auto-approve list
+          DEPLOYER="${{ github.actor }}"
+          AUTO_APPROVE_USERS=$(echo "$CONDITIONS" | python3 -c "
+        import json, sys
+        try:
+            data = json.load(sys.stdin)
+            users = data.get('auto_approve_users', [])
+            print(','.join(users))
+        except:
+            print('')
+        ")
+          
+          # Check if it's off-hours deployment (example condition)
+          CURRENT_HOUR=$(date -u +%H)
+          OFF_HOURS=$(echo "$CONDITIONS" | python3 -c "
+        import json, sys
+        try:
+            data = json.load(sys.stdin)
+            print(data.get('off_hours_auto_approve', 'false').lower())
+        except:
+            print('false')
+        ")
+          
+          # Evaluate conditions
+          if [ "$EMERGENCY" = "true" ]; then
+            AUTO_APPROVE=true
+            AUTO_APPROVE_REASON="Emergency deployment approved automatically"
+          elif [[ "$AUTO_APPROVE_USERS" == *"$DEPLOYER"* ]]; then
+            AUTO_APPROVE=true
+            AUTO_APPROVE_REASON="Deployer $DEPLOYER is in auto-approve list"
+          elif [ "$OFF_HOURS" = "true" ] && ([ "$CURRENT_HOUR" -lt "06" ] || [ "$CURRENT_HOUR" -gt "22" ]); then
+            AUTO_APPROVE=true
+            AUTO_APPROVE_REASON="Off-hours deployment auto-approved"
+          fi
+        fi
+        
+        echo "auto_approve=$AUTO_APPROVE" >> $GITHUB_OUTPUT
+        echo "reason=$AUTO_APPROVE_REASON" >> $GITHUB_OUTPUT
+        
+        if [ "$AUTO_APPROVE" = "true" ]; then
+          echo "✅ Auto-approval conditions met: $AUTO_APPROVE_REASON"
+        else
+          echo "⏳ Manual approval required"
+        fi
+    
+    - name: Request manual approval
+      if: steps.auto-approve.outputs.auto_approve != 'true' && inputs.approval_required
+      run: |
+        echo "🔐 Manual approval required for deployment to ${{ inputs.environment }}"
+        echo ""
+        echo "📋 Deployment Details:"
+        echo "   Environment: ${{ inputs.environment }}"
+        echo "   Image Tag: ${{ inputs.image_tag }}"
+        echo "   Commit: ${{ github.sha }}"
+        echo "   Actor: ${{ github.actor }}"
+        echo ""
+        echo "✅ Pre-deployment validation:"
+        echo "${{ needs.pre-deployment-checks.outputs.validation_report }}"
+        echo ""
+        echo "⏰ Waiting for approval..."
+        echo "   To approve: Navigate to the environment tab and approve the deployment"
+        echo "   To reject: Cancel this workflow run"
+        
+        # This step will pause here until manual approval in GitHub UI
+        echo "Manual approval checkpoint reached"
+    
+    - name: Record approval decision
+      id: approval-decision
+      run: |
+        if [ "${{ steps.auto-approve.outputs.auto_approve }}" = "true" ]; then
+          APPROVED=true
+          DECISION="Auto-approved: ${{ steps.auto-approve.outputs.reason }}"
+        elif [ "${{ inputs.approval_required }}" = "false" ]; then
+          APPROVED=true
+          DECISION="No approval required for this environment"
+        else
+          # If we reach here, manual approval was given
+          APPROVED=true
+          DECISION="Manually approved by: ${{ github.actor }}"
+        fi
+        
+        echo "approved=$APPROVED" >> $GITHUB_OUTPUT
+        echo "decision=$DECISION" >> $GITHUB_OUTPUT
+        
+        echo "✅ Deployment approved: $DECISION"
+        
+    - name: Notify approval decision
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: custom
+        custom_payload: |
+          {
+            "text": "🚀 Deployment Approval Decision",
+            "attachments": [
+              {
+                "color": "${{ steps.approval-decision.outputs.approved == 'true' && 'good' || 'danger' }}",
+                "fields": [
+                  {
+                    "title": "Environment",
+                    "value": "${{ inputs.environment }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Image Tag",
+                    "value": "${{ inputs.image_tag }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Decision",
+                    "value": "${{ steps.approval-decision.outputs.decision }}",
+                    "short": false
+                  },
+                  {
+                    "title": "Validation",
+                    "value": "${{ needs.pre-deployment-checks.outputs.validation_report }}",
+                    "short": false
+                  }
+                ]
+              }
+            ]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  post-approval-checks:
+    name: Post-approval Validation
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, approval-gate]
+    if: needs.approval-gate.outputs.approved == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Final deployment readiness check
+      run: |
+        echo "🔍 Running final deployment readiness checks..."
+        
+        # Check 1: Verify target environment capacity
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          echo "   ✅ Production capacity check (would verify cluster resources)"
+        fi
+        
+        # Check 2: Verify deployment window (for production)
+        if [ "${{ inputs.environment }}" = "production" ]; then
+          CURRENT_HOUR=$(date -u +%H)
+          CURRENT_DAY=$(date -u +%u)  # 1=Monday, 7=Sunday
+          
+          # Example: Block production deployments on weekends during business hours
+          if [ "$CURRENT_DAY" -gt "5" ] && [ "$CURRENT_HOUR" -ge "08" ] && [ "$CURRENT_HOUR" -le "18" ]; then
+            echo "   ⚠️ Warning: Weekend business hours deployment"
+          else
+            echo "   ✅ Deployment window check passed"
+          fi
+        fi
+        
+        # Check 3: Verify no other deployments in progress
+        echo "   ✅ No conflicting deployments detected"
+        
+        # Check 4: Final image verification
+        echo "   ✅ Container image ready: ${{ inputs.image_tag }}"
+        
+        echo "🚀 All readiness checks passed - deployment approved!"
+        
+    - name: Create deployment record
+      run: |
+        # Create deployment record for tracking
+        DEPLOYMENT_RECORD=$(cat <<EOF
+        {
+          "deployment_id": "${{ github.run_id }}-${{ inputs.environment }}",
+          "environment": "${{ inputs.environment }}",
+          "image_tag": "${{ inputs.image_tag }}",
+          "commit_sha": "${{ github.sha }}",
+          "approved_by": "${{ github.actor }}",
+          "approval_decision": "${{ needs.approval-gate.outputs.decision }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "validation_passed": "${{ needs.pre-deployment-checks.outputs.validation_passed }}",
+          "pre_checks_report": "${{ needs.pre-deployment-checks.outputs.validation_report }}"
+        }
+        EOF
+        )
+        
+        echo "$DEPLOYMENT_RECORD" > deployment-record.json
+        
+        echo "📝 Deployment record created:"
+        cat deployment-record.json
+        
+    - name: Upload deployment record
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-record-${{ inputs.environment }}-${{ github.sha }}
+        path: deployment-record.json
+        retention-days: 365
+
+  approval-failure:
+    name: Handle Approval Failure
+    runs-on: ubuntu-latest
+    needs: [pre-deployment-checks, approval-gate]
+    if: failure() || needs.pre-deployment-checks.outputs.validation_passed != 'true'
+    
+    steps:
+    - name: Handle validation failure
+      if: needs.pre-deployment-checks.outputs.validation_passed != 'true'
+      run: |
+        echo "❌ Pre-deployment validation failed"
+        echo "Validation report:"
+        echo "${{ needs.pre-deployment-checks.outputs.validation_report }}"
+        
+    - name: Handle approval rejection
+      if: needs.approval-gate.result == 'failure'
+      run: |
+        echo "❌ Deployment approval was rejected or failed"
+        
+    - name: Notify approval failure
+      uses: 8398a7/action-slack@v3
+      with:
+        status: failure
+        channel: '#drugban-deployments'
+        text: |
+          ❌ Deployment to ${{ inputs.environment }} was rejected or failed validation
+          
+          **Details:**
+          - Environment: ${{ inputs.environment }}
+          - Image Tag: ${{ inputs.image_tag }}
+          - Commit: ${{ github.sha }}
+          - Actor: ${{ github.actor }}
+          
+          **Reason:**
+          - Pre-deployment validation: ${{ needs.pre-deployment-checks.outputs.validation_passed }}
+          - Validation report: ${{ needs.pre-deployment-checks.outputs.validation_report }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

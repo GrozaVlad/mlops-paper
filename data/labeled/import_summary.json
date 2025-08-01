@@ -1,0 +1,38 @@
+{
+  "import_timestamp": "2025-07-26T17:45:18.393556",
+  "total_interactions": 7,
+  "data_sources": {
+    "bindingdb": 2,
+    "sample": 5
+  },
+  "interaction_type_distribution": {
+    "binding": 2,
+    "inhibitor": 2,
+    "agonist": 2,
+    "antagonist": 1
+  },
+  "evidence_quality_distribution": {
+    "high": 2,
+    "medium": 5
+  },
+  "data_splits": {
+    "train_size": 3,
+    "validation_size": 2,
+    "test_size": 2
+  },
+  "files_created": {
+    "labeled_data_directory": "data/labeled",
+    "complete_dataset": "data/labeled/complete_labeled_dataset.json",
+    "train_set": "data/labeled/train_dataset.json",
+    "validation_set": "data/labeled/validation_dataset.json",
+    "test_set": "data/labeled/test_dataset.json",
+    "label_studio_import": "label_studio/imported_labeled_tasks.json"
+  },
+  "quality_metrics": {
+    "high_quality_evidence": 2,
+    "medium_quality_evidence": 5,
+    "low_quality_evidence": 0,
+    "pre_labeled_count": 2,
+    "verified_count": 5
+  }
+}

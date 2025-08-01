@@ -1,32 +1,151 @@
-I want to write a paper in a journal and this is one of their themes for call for papers:
+# MLOps Drug Repurposing Project - Python Dependencies
+# 
+# This file contains all Python packages required to reproduce the MLOps pipeline
+# for drug repurposing using DrugBAN model with MLflow tracking and DVC data versioning.
+#
+# Installation: pip install -r requirements.txt
 
-MLOps Advancements: Improving Development, Management, and Interpretability in AI and Machine Learning
-Submission deadline: 31 March 2026
-Motivation and Scope
+# ============================================================================
+# Core ML/Data Science Libraries
+# ============================================================================
+numpy>=1.26.0,<2.0.0
+pandas>=2.0.0,<3.0.0
+scikit-learn>=1.7.0,<2.0.0
+scipy>=1.15.0,<2.0.0
+matplotlib>=3.10.0,<4.0.0
+seaborn>=0.13.0,<1.0.0
 
-The rapid advancement of data-driven artificial intelligence has accelerated the integration of machine learning (ML) models into real-world applications across diverse domains. This transition from experimental ML to production-ready AI systems has unveiled significant operational challenges in model development, deployment, monitoring, and maintenance. MLOps has emerged as a critical framework of practices and tools designed to streamline the entire ML lifecycle, ensuring automation, reproducibility, and scalability while bridging the gap between data science experimentation and the reliable operation of ML components in production.
+# ============================================================================
+# Deep Learning Framework
+# ============================================================================
+torch>=2.7.0,<3.0.0
+torchvision>=0.22.0,<1.0.0
+torch-geometric>=2.5.0,<3.0.0
+torchmetrics>=1.3.0,<2.0.0
 
-As AI adoption continues to expand, the need for robust, scalable, and transparent MLOps practices has become increasingly vital to guarantee the reliability and trustworthiness of deployed ML models. This Special Issue seeks to gather cutting-edge research, case studies, and insights from both academia and industry that address the key challenges and emerging trends in MLOps, with particular emphasis on practical solutions for improving AI and machine learning workflows.
+# ============================================================================
+# MLflow for Experiment Tracking and Model Management
+# ============================================================================
+mlflow>=3.1.0,<4.0.0
+mlflow-skinny>=3.1.0,<4.0.0
 
-We invite high-quality submissions that explore, but are not limited to, the following topics:
+# ============================================================================
+# DVC for Data Version Control
+# ============================================================================
+dvc[s3]>=3.61.0,<4.0.0
+dvc-data>=3.16.0,<4.0.0
+dvc-objects>=5.1.0,<6.0.0
+dvc-render>=1.0.0,<2.0.0
+dvc-studio-client>=0.21.0,<1.0.0
 
-MLOps Frameworks and Best Practices
-ML pipelines orchestration
-ML model reproducibility, traceability, and explainability
-Continuous integration/continuous delivery (CI/CD) practices for ML models
-ML model monitoring and observability
-MLOps practices to ensure Interpretability and Explainability in AI systems
-Application of MLOps principles to Knowledge and Semantic Representation
-Application of MLOps principles to large language models (LLMOps)
-ML-specific architecture design and patterns
-Experience reports on real-world MLOps applications
-Challenges in applying MLOps to specific domains (e.g., healthcare and finance)
-Ethics and Accountability in MLOps
-AutoML applications in MLOps
-Collaboration and team dynamics in MLOps
-Regulatory and policy aspects of MLOps
-MLOps strategies for Green AI
-Security and data privacy in MLOps
-The proponents of this Special Issue are also the organizers of the Workshop on Machine Learning Operations – MLOps'25, which will be held at ECAI 2025, one of the premier conferences in artificial intelligence. As part of this initiative, we aim to provide an opportunity for authors of papers accepted at the workshop to submit an extended version of their work to this Special Issue. This will enable further development of innovative research contributions presented at MLOps'25, fostering deeper discussions and broader dissemination of advancements in MLOps methodologies, tools, and applications.
+# ============================================================================
+# Cheminformatics Libraries
+# ============================================================================
+rdkit-pypi>=2022.9.0
+# Note: rdkit-pypi is a PyPI distribution of RDKit for easier installation
+# Alternative: conda install -c conda-forge rdkit (if using conda)
 
-I wish to create a pipeline that encompasses everything from the data step ( define data and establishing a baseline ), labelling and organising data to the modelling step ( selecting and training a model, performing error analysis ) to deployment ( deploy in production, monitoring and maintaining the system ) . The emphasis should be especially on the last part (deployment) and I want to use a model that already exists for drug repurposing lets say. I want a complete plan on the tools to use for the pipeline and a model I can use as the example( The important aspect are the mlops tools and how they help). Please give me this plan.
+# ============================================================================
+# Web Framework for API Development
+# ============================================================================
+fastapi>=0.116.0,<1.0.0
+uvicorn>=0.35.0,<1.0.0
+starlette>=0.47.0,<1.0.0
+
+# ============================================================================
+# Database and Data Storage
+# ============================================================================
+sqlalchemy>=2.0.0,<3.0.0
+alembic>=1.16.0,<2.0.0
+pyarrow>=20.0.0,<21.0.0
+
+# ============================================================================
+# AWS/Cloud Integration
+# ============================================================================
+boto3>=1.39.0,<2.0.0
+botocore>=1.39.0,<2.0.0
+s3fs>=2025.5.0,<2026.0.0
+
+# ============================================================================
+# Configuration and CLI
+# ============================================================================
+pyyaml>=6.0.0
+click>=8.2.0,<9.0.0
+typer>=0.16.0,<1.0.0
+pydantic>=2.11.0,<3.0.0
+
+# ============================================================================
+# Development and Testing
+# ============================================================================
+pytest>=7.0.0,<8.0.0
+pytest-cov>=4.0.0,<5.0.0
+black>=24.0.0
+flake8>=6.0.0,<7.0.0
+mypy>=1.0.0,<2.0.0
+
+# ============================================================================
+# Jupyter and Interactive Development
+# ============================================================================
+jupyter>=1.0.0
+notebook>=7.0.0,<8.0.0
+jupyterlab>=4.0.0,<5.0.0
+ipywidgets>=8.0.0,<9.0.0
+
+# ============================================================================
+# Utilities and Support Libraries
+# ============================================================================
+requests>=2.32.0,<3.0.0
+tqdm>=4.67.0,<5.0.0
+python-dateutil>=2.9.0
+pathspec>=0.12.0,<1.0.0
+packaging>=25.0,<26.0
+platformdirs>=4.3.0,<5.0.0
+
+# ============================================================================
+# Visualization and Plotting
+# ============================================================================
+plotly>=5.0.0,<6.0.0
+kaleido>=0.2.0  # For static image export with plotly
+
+# ============================================================================
+# Data Validation and Quality
+# ============================================================================
+great-expectations>=0.18.0,<1.0.0
+pandera>=0.17.0,<1.0.0
+
+# ============================================================================
+# Model Interpretation and Explainability
+# ============================================================================
+shap>=0.45.0,<1.0.0
+lime>=0.2.0,<1.0.0
+
+# ============================================================================
+# Containerization Support
+# ============================================================================
+docker>=7.1.0,<8.0.0
+
+# ============================================================================
+# Optional: GPU Support (uncomment if using CUDA)
+# ============================================================================
+# torch-cuda  # For CUDA support
+# nvidia-ml-py  # For GPU monitoring
+
+# ============================================================================
+# Environment-specific requirements
+# ============================================================================
+
+# Development environment
+jupyter-lab-code-formatter>=2.0.0  # Code formatting in JupyterLab
+pre-commit>=3.0.0  # Git hooks for code quality
+
+# Production environment  
+gunicorn>=23.0.0  # WSGI server for production
+prometheus-client>=0.19.0  # Metrics collection
+
+# ============================================================================
+# Version Constraints Notes:
+# ============================================================================
+# - Upper bounds are set to prevent breaking changes in major versions
+# - Lower bounds ensure compatibility with required features
+# - Some packages (like torch) may require specific versions for compatibility
+# - For production, consider pinning to exact versions for reproducibility

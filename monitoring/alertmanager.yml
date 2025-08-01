@@ -1,0 +1,245 @@
+# AlertManager Configuration for DrugBAN MLOps Monitoring
+# Handles alert routing, grouping, and notifications
+
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'drugban-alerts@company.com'
+  smtp_auth_username: 'drugban-alerts@company.com'
+  smtp_auth_password: 'your-app-password'
+  smtp_require_tls: true
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Alert routing configuration
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+  
+  routes:
+    # Critical model alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+      
+    # Model performance alerts
+    - match_re:
+        alertname: 'DrugBAN.*'
+      receiver: 'model-team'
+      group_by: ['alertname', 'service']
+      group_wait: 2m
+      repeat_interval: 2h
+      
+    # Infrastructure alerts
+    - match:
+        service: infrastructure
+      receiver: 'infrastructure-team'
+      group_wait: 1m
+      repeat_interval: 30m
+      
+    # Data drift alerts
+    - match_re:
+        alertname: '.*Drift.*'
+      receiver: 'data-science-team'
+      group_wait: 5m
+      repeat_interval: 6h
+
+# Alert receivers/notification channels
+receivers:
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops-team@company.com'
+        subject: '[DrugBAN] {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          
+          Start Time: {{ .StartsAt }}
+          End Time: {{ .EndsAt }}
+          {{ end }}
+        headers:
+          Subject: '[DrugBAN Alert] {{ .GroupLabels.alertname }}'
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'critical-alerts@company.com'
+        subject: '[CRITICAL] DrugBAN Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          🚨 CRITICAL ALERT 🚨
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          
+          This requires immediate attention!
+          
+          Start Time: {{ .StartsAt }}
+          {{ end }}
+        headers:
+          Priority: high
+    
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#drugban-critical'
+        title: '🚨 DrugBAN Critical Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          {{ end }}
+        color: 'danger'
+        
+    pagerduty_configs:
+      - service_key: 'your-pagerduty-service-key'
+        description: 'DrugBAN Critical Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'model-team'
+    email_configs:
+      - to: 'ml-team@company.com'
+        subject: '[DrugBAN Model] {{ .GroupLabels.alertname }}'
+        body: |
+          🤖 DrugBAN Model Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          
+          Model Performance Details:
+          - Service: {{ .Labels.service }}
+          - Instance: {{ .Labels.instance }}
+          - Severity: {{ .Labels.severity }}
+          
+          Recommended Actions:
+          1. Check model performance metrics in Grafana
+          2. Review recent predictions for quality
+          3. Investigate potential data drift
+          4. Consider model retraining if persistent
+          
+          Dashboard: http://grafana.drugban.local/d/drugban-model-performance
+          
+          Start Time: {{ .StartsAt }}
+          {{ end }}
+    
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#drugban-models'
+        title: '🤖 DrugBAN Model Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Dashboard:* <http://grafana.drugban.local/d/drugban-model-performance|Model Performance>
+          {{ end }}
+        color: 'warning'
+
+  - name: 'data-science-team'
+    email_configs:
+      - to: 'data-science@company.com'
+        subject: '[DrugBAN Data] {{ .GroupLabels.alertname }}'
+        body: |
+          📊 DrugBAN Data Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          
+          Data Quality Details:
+          - Alert Type: {{ .Labels.alertname }}
+          - Severity: {{ .Labels.severity }}
+          - Service: {{ .Labels.service }}
+          
+          Investigation Steps:
+          1. Check data drift reports in Evidently
+          2. Review input data quality
+          3. Validate molecular feature extraction
+          4. Assess need for model retraining
+          
+          Monitoring Dashboard: http://grafana.drugban.local/d/drugban-overview
+          
+          Start Time: {{ .StartsAt }}
+          {{ end }}
+    
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#drugban-data'
+        title: '📊 DrugBAN Data Alert'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Dashboard:* <http://grafana.drugban.local/d/drugban-overview|Overview Dashboard>
+          {{ end }}
+        color: 'good'
+
+  - name: 'infrastructure-team'
+    email_configs:
+      - to: 'infrastructure@company.com'
+        subject: '[DrugBAN Infra] {{ .GroupLabels.alertname }}'
+        body: |
+          🏗️ DrugBAN Infrastructure Alert
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          
+          Infrastructure Details:
+          - Service: {{ .Labels.service }}
+          - Instance: {{ .Labels.instance }}
+          - Severity: {{ .Labels.severity }}
+          
+          Troubleshooting:
+          1. Check Kubernetes pod status
+          2. Review resource utilization
+          3. Validate network connectivity
+          4. Check persistent volume availability
+          
+          kubectl get pods -n drugban
+          kubectl describe pod {{ .Labels.instance }} -n drugban
+          
+          Start Time: {{ .StartsAt }}
+          {{ end }}
+
+# Inhibit rules to prevent alert spam
+inhibit_rules:
+  # Inhibit any warning-level alerts if the same alertname has a critical alert
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service', 'instance']
+  
+  # Inhibit model alerts if the API is down
+  - source_match:
+      alertname: 'DrugBANAPIDown'
+    target_match_re:
+      alertname: 'DrugBAN.*'
+    equal: ['service']
+
+# Global alert configuration
+global:
+  # External URL for AlertManager
+  external_url: 'http://alertmanager.drugban.local'
+  
+  # SMTP configuration for email alerts
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'drugban-alerts@company.com'
+  smtp_auth_username: 'drugban-alerts@company.com'
+  smtp_auth_password: 'your-app-password'
+  smtp_require_tls: true
+  
+  # Default notification timeout
+  resolve_timeout: 5m

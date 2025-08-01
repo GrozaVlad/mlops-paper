@@ -1,0 +1,14 @@
+artifact_uri: /Users/grozavlad/Projects/MLOpsProject/mlflow_artifacts/drug_repurposing_baseline/79db3c39b1ad4845bf090e0365a8904a/artifacts
+end_time: 1753538654585
+entry_point_name: ''
+experiment_id: '897862512375808083'
+lifecycle_stage: active
+run_id: 79db3c39b1ad4845bf090e0365a8904a
+run_name: baseline_evaluation
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1753538654551
+status: 3
+tags: []
+user_id: grozavlad

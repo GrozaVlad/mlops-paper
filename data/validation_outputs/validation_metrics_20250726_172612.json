@@ -1,0 +1,53 @@
+{
+  "validation_timestamp": "2025-07-26T17:26:05.015513",
+  "total_datasets": 3,
+  "datasets_passed": 3,
+  "total_issues": 0,
+  "overall_validation_passed": true,
+  "drug_target_interactions_quality_score": 96.0,
+  "drug_target_interactions_total_rows": 5,
+  "drug_target_interactions_issues_count": 0,
+  "drug_target_interactions_completeness_score": 100.0,
+  "drug_metadata_quality_score": 93.33,
+  "drug_metadata_total_rows": 5,
+  "drug_metadata_issues_count": 0,
+  "drug_metadata_completeness_score": 100.0,
+  "target_metadata_quality_score": 90.0,
+  "target_metadata_total_rows": 3,
+  "target_metadata_issues_count": 0,
+  "target_metadata_completeness_score": 100.0,
+  "dataset_details": {
+    "drug_target_interactions": {
+      "quality_score": 96.0,
+      "completeness_score": 100.0,
+      "validity_score": 100,
+      "great_expectations_score": 80.0,
+      "total_rows": 5,
+      "total_columns": 5,
+      "issues_count": 0,
+      "missing_data_avg": 0.0
+    },
+    "drug_metadata": {
+      "quality_score": 93.33,
+      "completeness_score": 100.0,
+      "validity_score": 100,
+      "great_expectations_score": 66.67,
+      "total_rows": 5,
+      "total_columns": 5,
+      "issues_count": 0,
+      "missing_data_avg": 0.0
+    },
+    "target_metadata": {
+      "quality_score": 90.0,
+      "completeness_score": 100.0,
+      "validity_score": 100,
+      "great_expectations_score": 50.0,
+      "total_rows": 3,
+      "total_columns": 5,
+      "issues_count": 0,
+      "missing_data_avg": 0.0
+    }
+  },
+  "overall_quality_score": 93.11,
+  "data_readiness_level": "STAGING_READY"
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "source": "bindingdb",
+    "drug_id": "bindingdb_drug_0",
+    "target_id": "bindingdb_target_0",
+    "interaction_type": "binding",
+    "binding_affinity": NaN,
+    "confidence_score": 0.8,
+    "evidence_quality": "high",
+    "annotation_status": "pre_labeled",
+    "drug_metadata": {
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": null,
+      "logp": null
+    },
+    "target_metadata": {
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    }
+  },
+  {
+    "source": "bindingdb",
+    "drug_id": "bindingdb_drug_1",
+    "target_id": "bindingdb_target_1",
+    "interaction_type": "binding",
+    "binding_affinity": NaN,
+    "confidence_score": 0.8,
+    "evidence_quality": "high",
+    "annotation_status": "pre_labeled",
+    "drug_metadata": {
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": null,
+      "logp": null
+    },
+    "target_metadata": {
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    }
+  }
+]

@@ -1,0 +1,222 @@
+[
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL85",
+    "target_id": "ENSP003",
+    "interaction_type": "antagonist",
+    "binding_affinity": 5.9,
+    "confidence_score": 0.76,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Caffeine",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07
+    },
+    "target_metadata": {
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL85",
+    "target_id": "ENSP003",
+    "interaction_type": "antagonist",
+    "binding_affinity": 5.9,
+    "confidence_score": 0.76,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Caffeine",
+      "smiles": "Cn1cnc2c1c(n(C)c(=O)n2C)=O",
+      "molecular_weight": 194.19,
+      "logp": -0.07
+    },
+    "target_metadata": {
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL85",
+    "target_id": "ENSP003",
+    "interaction_type": "antagonist",
+    "binding_affinity": 5.9,
+    "confidence_score": 0.76,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Caffeine",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07
+    },
+    "target_metadata": {
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "C(c1ccc(CC(C)C)cc1)(C)C(=O)O",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "c1(C(C(O)=O)C)ccc(cc1)CC(C)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample_enumerated",
+    "drug_id": "CHEMBL53",
+    "target_id": "ENSP002",
+    "interaction_type": "agonist",
+    "binding_affinity": 6.8,
+    "confidence_score": 0.87,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Ibuprofen",
+      "smiles": "n1cn(C)c2c(=O)n(c(n(C)c21)=O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97
+    },
+    "target_metadata": {
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    }
+  },
+  {
+    "source": "sample",
+    "drug_id": "CHEMBL85",
+    "target_id": "ENSP003",
+    "interaction_type": "antagonist",
+    "binding_affinity": 5.9,
+    "confidence_score": 0.76,
+    "evidence_quality": "medium",
+    "annotation_status": "verified",
+    "drug_metadata": {
+      "drug_name": "Caffeine",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07
+    },
+    "target_metadata": {
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    }
+  }
+]

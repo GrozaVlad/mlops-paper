@@ -1,0 +1,11 @@
+[core]
+    remote = data
+['remote "data"']
+    url = s3://mlops-drug-repurposing-dev-data-randomsuffix
+    credentialpath = /Users/grozavlad/.aws/credentials
+['remote "models"']
+    url = s3://mlops-drug-repurposing-dev-models-randomsuffix
+    credentialpath = /Users/grozavlad/.aws/credentials
+['remote "artifacts"']
+    url = s3://mlops-drug-repurposing-dev-artifacts-randomsuffix
+    credentialpath = /Users/grozavlad/.aws/credentials

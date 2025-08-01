@@ -11,26 +11,38 @@ Complete MLOps pipeline for drug repurposing using existing pre-trained models, 
 
 ## Implementation Phases
 
-### Phase 1: Data Management & Baseline (Weeks 1-2)
+### Phase 1: Infrastructure Setup & Data Management (Weeks 1-2)
 
 #### Tools & Technologies:
+- **Terraform**: Infrastructure as Code for cloud resources with multi-environment support
+- **AWS/Azure/GCP**: Cloud platform (AWS recommended)
 - **DVC (Data Version Control)**: Track datasets, models, and experiments
 - **MLflow**: Experiment tracking and model registry
 - **Apache Airflow**: Data pipeline orchestration
 - **Great Expectations**: Data validation and quality checks
 
 #### Implementation Steps:
-1. Set up DVC for data versioning
-   - Initialize DVC repository
+1. Multi-Environment Infrastructure as Code setup
+   - Create Terraform modules for cloud infrastructure with environment isolation
+   - Implement environment-specific configurations (dev, staging, prod)
+   - Provision environment-prefixed VPC, subnets, security groups, and IAM roles
+   - Set up environment-specific S3 buckets for data storage and model artifacts
+   - Deploy environment-isolated EKS clusters for container orchestration
+   - Create environment-specific RDS instances for metadata storage (MLflow, Airflow)
+   - Set up environment-aware CloudWatch for logging and monitoring
+   - Configure separate CIDR blocks per environment to prevent conflicts
+
+2. Set up DVC for data versioning
+   - Initialize DVC repository with S3 remote storage
    - Track drug-target interaction datasets (BIOSNAP, BindingDB)
    - Create data pipeline stages
 
-2. Establish baseline with existing DrugBAN model
+3. Establish baseline with existing DrugBAN model
    - Download pre-trained DrugBAN weights
-   - Set up MLflow experiment tracking
+   - Set up MLflow experiment tracking on provisioned infrastructure
    - Record baseline metrics (AUC, precision, recall)
 
-3. Data validation pipeline
+4. Data validation pipeline
    - Implement Great Expectations suite for data quality
    - Create data drift detection mechanisms
    - Set up automated data validation workflows
@@ -193,10 +205,17 @@ Complete MLOps pipeline for drug repurposing using existing pre-trained models, 
 - Data quality assurance for reliable predictions
 - Automated data pipeline validation
 
+### Infrastructure as Code (Terraform)
+- Multi-environment deployment capabilities (dev, staging, prod)
+- Environment isolation with separate CIDR blocks and resource naming
+- Consistent infrastructure provisioning across environments
+- Cost optimization through environment-specific configurations
+
 ### Deployment & Monitoring (Kubernetes + Prometheus + Grafana)
 - Scalable model serving for high-throughput screening
 - Real-time monitoring of prediction quality
 - Automated scaling based on demand
+- Environment-aware monitoring and alerting
 
 ### Model Governance (MLflow Registry + ArgoCD)
 - Controlled model deployment process
@@ -222,12 +241,31 @@ Complete MLOps pipeline for drug repurposing using existing pre-trained models, 
 - **Weeks 5-7**: Production deployment and monitoring (Primary Focus)
 - **Weeks 8-9**: Maintenance automation and documentation
 
-## Deliverables for Paper
-1. Complete MLOps pipeline architecture
-2. Performance benchmarks and comparisons
-3. Deployment strategies and lessons learned
-4. Monitoring and maintenance best practices
-5. Open-source code repository
-6. Case study analysis for pharmaceutical industry
+## Multi-Environment Deployment Strategy
 
-This plan provides a comprehensive MLOps implementation with strong emphasis on deployment and production practices, suitable for a high-quality journal submission on MLOps advancements.
+### Environment Isolation Benefits:
+- **Development**: Cost-optimized setup with minimal resources for rapid iteration
+- **Staging**: Production-like environment for thorough testing and validation
+- **Production**: High-availability setup with enhanced monitoring and security
+
+### Infrastructure Management:
+- **Terraform Workspaces**: Separate state management per environment
+- **Environment-Specific Configurations**: Tailored resource sizing and features
+- **CIDR Isolation**: Separate network ranges (dev: 10.0.x.x, staging: 10.1.x.x, prod: 10.2.x.x)
+- **Resource Naming**: Environment prefixes for clear resource identification
+
+### Cost Management:
+- **Development**: NAT Gateway disabled, minimal instance sizes
+- **Staging**: Balanced configuration for realistic testing
+- **Production**: Performance-optimized with full redundancy
+
+## Deliverables for Paper
+1. Complete MLOps pipeline architecture with multi-environment deployment
+2. Performance benchmarks and comparisons across environments
+3. Deployment strategies and lessons learned from IaC implementation
+4. Monitoring and maintenance best practices for each environment
+5. Open-source code repository with Terraform modules
+6. Case study analysis for pharmaceutical industry multi-environment MLOps
+7. Cost analysis and optimization strategies per environment
+
+This plan provides a comprehensive MLOps implementation with strong emphasis on deployment, production practices, and multi-environment infrastructure management, suitable for a high-quality journal submission on MLOps advancements.

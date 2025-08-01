@@ -1,0 +1,97 @@
+schema: '2.0'
+stages:
+  data_download:
+    cmd: python data/download_datasets.py
+    deps:
+    - path: data/download_datasets.py
+      hash: md5
+      md5: 0db28d335c758011c2c4795e3824587f
+      size: 8481
+      isexec: true
+    outs:
+    - path: data/raw/bindingdb/
+      hash: md5
+      md5: 97ca279cb16505f38147e1615ce0960c.dir
+      size: 481
+      nfiles: 3
+    - path: data/raw/biosnap/
+      hash: md5
+      md5: c2610110c23aa14d62fa6f8a7ec4bb2b.dir
+      size: 592
+      nfiles: 3
+    - path: data/raw/sample/
+      hash: md5
+      md5: ac2a17dbd0a408346382297fe412d617.dir
+      size: 795
+      nfiles: 3
+  data_validation:
+    cmd: python scripts/validate_data.py
+    deps:
+    - path: data/raw/sample/
+      hash: md5
+      md5: ac2a17dbd0a408346382297fe412d617.dir
+      size: 795
+      nfiles: 3
+    - path: params.yaml
+      hash: md5
+      md5: ebd0587f6698209ca4ead0e93fbae644
+      size: 2103
+    - path: scripts/validate_data.py
+      hash: md5
+      md5: c4f6297d9a42bb3aac3b19fca30e24b4
+      size: 25530
+      isexec: true
+    outs:
+    - path: data/validation_metrics.json
+      hash: md5
+      md5: 7a6242c539ca999347563cf3c601224b
+      size: 1592
+    - path: data/validation_outputs/data_validation_summary.png
+      hash: md5
+      md5: 83b19e0097e8e100addd4835acdd6f09
+      size: 468502
+    - path: data/validation_report.json
+      hash: md5
+      md5: cb7e997cb3920b0a4c51af1e569c3018
+      size: 9124
+  data_quality_dashboard:
+    cmd: python scripts/data_quality_dashboard_simple.py
+    deps:
+    - path: data/validation_metrics.json
+      hash: md5
+      md5: 7a6242c539ca999347563cf3c601224b
+      size: 1592
+    - path: data/validation_report.json
+      hash: md5
+      md5: cb7e997cb3920b0a4c51af1e569c3018
+      size: 9124
+    - path: scripts/data_quality_dashboard_simple.py
+      hash: md5
+      md5: bd1fdd529e91107d6c09d410ca23b88d
+      size: 6364
+    outs:
+    - path: data/validation_outputs/data_quality_dashboard_simple.png
+      hash: md5
+      md5: 54553c61a51c074b0c243ae7649760c6
+      size: 375045
+    - path: data/validation_outputs/data_quality_summary.md
+      hash: md5
+      md5: 75bf46df2b12deb699bc8a7630cff800
+      size: 543
+  great_expectations_validation:
+    cmd: python scripts/simple_expectations_validation.py
+    deps:
+    - path: data/raw/sample/
+      hash: md5
+      md5: ac2a17dbd0a408346382297fe412d617.dir
+      size: 795
+      nfiles: 3
+    - path: scripts/simple_expectations_validation.py
+      hash: md5
+      md5: 0845c34bad983a07ae997ba4fbf6b72c
+      size: 5863
+    outs:
+    - path: data/great_expectations_validation.json
+      hash: md5
+      md5: 873d77eb9ba54ce53920da5b44462a8e
+      size: 3222

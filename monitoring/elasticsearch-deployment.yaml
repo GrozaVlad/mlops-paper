@@ -1,0 +1,157 @@
+# Elasticsearch Deployment for DrugBAN Centralized Logging
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: monitoring
+  labels:
+    app: elasticsearch
+data:
+  elasticsearch.yml: |
+    cluster.name: drugban-logs
+    node.name: elasticsearch-node
+    path.data: /usr/share/elasticsearch/data
+    path.logs: /usr/share/elasticsearch/logs
+    network.host: 0.0.0.0
+    http.port: 9200
+    discovery.type: single-node
+    bootstrap.memory_lock: false
+    
+    # Security settings
+    xpack.security.enabled: false
+    xpack.monitoring.enabled: true
+    xpack.graph.enabled: false
+    xpack.watcher.enabled: false
+    
+    # Performance settings
+    indices.query.bool.max_clause_count: 10000
+    search.max_buckets: 100000
+    
+    # Logging configuration
+    logger.level: INFO
+    logger.org.elasticsearch.discovery: WARN
+
+  jvm.options: |
+    -Xms512m
+    -Xmx512m
+    -XX:+UseG1GC
+    -XX:+UseG1OldGCMixedGCCount
+    -XX:+DisableExplicitGC
+    -Djava.io.tmpdir=${ES_TMPDIR}
+    -XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/usr/share/elasticsearch/data
+    -XX:ErrorFile=/usr/share/elasticsearch/logs/hs_err_pid%p.log
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elasticsearch-storage
+  namespace: monitoring
+  labels:
+    app: elasticsearch
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: gp2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  namespace: monitoring
+  labels:
+    app: elasticsearch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      initContainers:
+        - name: configure-sysctl
+          image: busybox:1.35
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+          securityContext:
+            privileged: true
+      containers:
+        - name: elasticsearch
+          image: elasticsearch:8.5.0
+          env:
+            - name: discovery.type
+              value: single-node
+            - name: ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+            - name: xpack.security.enabled
+              value: "false"
+          ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: elasticsearch-config-volume
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              subPath: elasticsearch.yml
+            - name: elasticsearch-config-volume
+              mountPath: /usr/share/elasticsearch/config/jvm.options
+              subPath: jvm.options
+            - name: elasticsearch-storage-volume
+              mountPath: /usr/share/elasticsearch/data
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?wait_for_status=yellow&timeout=50s
+              port: 9200
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 10
+      volumes:
+        - name: elasticsearch-config-volume
+          configMap:
+            name: elasticsearch-config
+        - name: elasticsearch-storage-volume
+          persistentVolumeClaim:
+            claimName: elasticsearch-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: monitoring
+  labels:
+    app: elasticsearch
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9200
+      targetPort: 9200
+      name: http
+    - port: 9300
+      targetPort: 9300
+      name: transport
+  selector:
+    app: elasticsearch

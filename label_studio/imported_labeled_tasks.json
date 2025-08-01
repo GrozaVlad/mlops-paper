@@ -1,0 +1,464 @@
+[
+  {
+    "id": 1,
+    "data": {
+      "drug_id": "bindingdb_drug_0",
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": "N/A",
+      "logp": "N/A",
+      "target_id": "bindingdb_target_0",
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    },
+    "annotations": [
+      {
+        "id": 1,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 1,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "binding"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 5.0
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "high"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "bindingdb",
+      "annotation_status": "pre_labeled",
+      "import_date": "2025-07-26T17:45:18.393119"
+    }
+  },
+  {
+    "id": 2,
+    "data": {
+      "drug_id": "bindingdb_drug_1",
+      "drug_name": "",
+      "smiles": "",
+      "molecular_weight": "N/A",
+      "logp": "N/A",
+      "target_id": "bindingdb_target_1",
+      "target_name": "",
+      "uniprot_id": "",
+      "organism": "Homo sapiens",
+      "target_class": ""
+    },
+    "annotations": [
+      {
+        "id": 2,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 2,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "binding"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 5.0
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "high"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "bindingdb",
+      "annotation_status": "pre_labeled",
+      "import_date": "2025-07-26T17:45:18.393125"
+    }
+  },
+  {
+    "id": 3,
+    "data": {
+      "drug_id": "CHEMBL25",
+      "drug_name": "Aspirin",
+      "smiles": "CC(=O)OC1=CC=CC=C1C(=O)O",
+      "molecular_weight": 180.16,
+      "logp": 1.19,
+      "target_id": "ENSP001",
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    },
+    "annotations": [
+      {
+        "id": 3,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 3,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "inhibitor"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 7.2
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "medium"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "sample",
+      "annotation_status": "verified",
+      "import_date": "2025-07-26T17:45:18.393127"
+    }
+  },
+  {
+    "id": 4,
+    "data": {
+      "drug_id": "CHEMBL53",
+      "drug_name": "Ibuprofen",
+      "smiles": "CC(C)CC1=CC=C(C=C1)C(C(=O)O)C",
+      "molecular_weight": 206.28,
+      "logp": 3.97,
+      "target_id": "ENSP002",
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    },
+    "annotations": [
+      {
+        "id": 4,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 4,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "agonist"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 6.8
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "medium"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "sample",
+      "annotation_status": "verified",
+      "import_date": "2025-07-26T17:45:18.393129"
+    }
+  },
+  {
+    "id": 5,
+    "data": {
+      "drug_id": "CHEMBL85",
+      "drug_name": "Caffeine",
+      "smiles": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+      "molecular_weight": 194.19,
+      "logp": -0.07,
+      "target_id": "ENSP003",
+      "target_name": "Adenosine receptor A2A",
+      "uniprot_id": "P29274",
+      "organism": "Homo sapiens",
+      "target_class": "GPCR"
+    },
+    "annotations": [
+      {
+        "id": 5,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 5,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "antagonist"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 3
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 5.9
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "medium"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "sample",
+      "annotation_status": "verified",
+      "import_date": "2025-07-26T17:45:18.393131"
+    }
+  },
+  {
+    "id": 6,
+    "data": {
+      "drug_id": "CHEMBL123",
+      "drug_name": "Paracetamol",
+      "smiles": "CC(=O)NC1=CC=C(C=C1)O",
+      "molecular_weight": 151.16,
+      "logp": 0.46,
+      "target_id": "ENSP001",
+      "target_name": "COX-1",
+      "uniprot_id": "P23219",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    },
+    "annotations": [
+      {
+        "id": 6,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 6,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "inhibitor"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 8.1
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "medium"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "sample",
+      "annotation_status": "verified",
+      "import_date": "2025-07-26T17:45:18.393133"
+    }
+  },
+  {
+    "id": 7,
+    "data": {
+      "drug_id": "CHEMBL456",
+      "drug_name": "Morphine",
+      "smiles": "CN1CCC23C4C(=O)CCC2(C1CC5=C3C(=C(C=C5)O)O4)O",
+      "molecular_weight": 285.34,
+      "logp": 0.89,
+      "target_id": "ENSP002",
+      "target_name": "COX-2",
+      "uniprot_id": "P35354",
+      "organism": "Homo sapiens",
+      "target_class": "enzyme"
+    },
+    "annotations": [
+      {
+        "id": 7,
+        "created_username": "import_script",
+        "created_ago": "imported",
+        "task": 7,
+        "result": [
+          {
+            "value": {
+              "choices": [
+                "agonist"
+              ]
+            },
+            "from_name": "interaction_type",
+            "to_name": "drug_id",
+            "type": "choices"
+          },
+          {
+            "value": {
+              "rating": 4
+            },
+            "from_name": "confidence",
+            "to_name": "drug_id",
+            "type": "rating"
+          },
+          {
+            "value": {
+              "number": 6.5
+            },
+            "from_name": "binding_affinity",
+            "to_name": "drug_id",
+            "type": "number"
+          },
+          {
+            "value": {
+              "choices": [
+                "medium"
+              ]
+            },
+            "from_name": "evidence_quality",
+            "to_name": "drug_id",
+            "type": "choices"
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "source": "sample",
+      "annotation_status": "verified",
+      "import_date": "2025-07-26T17:45:18.393135"
+    }
+  }
+]

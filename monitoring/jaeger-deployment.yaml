@@ -1,0 +1,174 @@
+# Jaeger Deployment for DrugBAN Distributed Tracing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+  namespace: monitoring
+  labels:
+    app: jaeger
+data:
+  jaeger.yml: |
+    # Jaeger configuration for all-in-one deployment
+    # For production, use separate collector, query, and agent components
+    
+    # Collector configuration
+    collector:
+      zipkin:
+        host-port: ":9411"
+      
+    # Query configuration
+    query:
+      ui-config: |
+        {
+          "tracking": {
+            "gaID": "UA-000000-2"
+          }
+        }
+    
+    # Agent configuration
+    agent:
+      tags:
+        environment: production
+        service: drugban
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+        - name: jaeger
+          image: jaegertracing/all-in-one:1.40
+          env:
+            - name: COLLECTOR_ZIPKIN_HOST_PORT
+              value: ":9411"
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: SPAN_STORAGE_TYPE
+              value: "memory"
+            - name: MEMORY_MAX_TRACES
+              value: "50000"
+            - name: QUERY_UI_CONFIG
+              value: "/etc/jaeger/jaeger.yml"
+          ports:
+            - containerPort: 16686
+              name: query
+            - containerPort: 14268
+              name: jaeger-http
+            - containerPort: 14267
+              name: jaeger-grpc
+            - containerPort: 9411
+              name: zipkin
+            - containerPort: 4317
+              name: otlp-grpc
+            - containerPort: 4318
+              name: otlp-http
+            - containerPort: 6831
+              name: jaeger-agent
+              protocol: UDP
+            - containerPort: 6832
+              name: jaeger-agent2
+              protocol: UDP
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: jaeger-config-volume
+              mountPath: /etc/jaeger
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 16686
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 16686
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 10
+      volumes:
+        - name: jaeger-config-volume
+          configMap:
+            name: jaeger-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  type: ClusterIP
+  ports:
+    - port: 16686
+      targetPort: 16686
+      name: query
+    - port: 14268
+      targetPort: 14268
+      name: jaeger-http
+    - port: 14267
+      targetPort: 14267
+      name: jaeger-grpc
+    - port: 9411
+      targetPort: 9411
+      name: zipkin
+    - port: 4317
+      targetPort: 4317
+      name: otlp-grpc
+    - port: 4318
+      targetPort: 4318
+      name: otlp-http
+    - port: 6831
+      targetPort: 6831
+      name: jaeger-agent
+      protocol: UDP
+    - port: 6832
+      targetPort: 6832
+      name: jaeger-agent2
+      protocol: UDP
+  selector:
+    app: jaeger
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jaeger-ingress
+  namespace: monitoring
+  labels:
+    app: jaeger
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  rules:
+    - host: jaeger.drugban.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jaeger
+                port:
+                  number: 16686

@@ -1,0 +1,39 @@
+{
+  "augmentation_timestamp": "2025-07-26T17:48:52.549062",
+  "original_data_size": 3,
+  "augmented_data_size": 10,
+  "augmentation_ratio": 3.3333333333333335,
+  "techniques_applied": [
+    "class_balancing",
+    "bootstrap_sampling",
+    "chemical_enumeration",
+    "feature_noise_injection",
+    "feature_dropout"
+  ],
+  "feature_augmentation": {
+    "morgan": {
+      "original_shape": "(3, 2048)",
+      "augmented_shape": "(6, 2048)",
+      "augmentation_factor": 2.0
+    },
+    "descriptors": {
+      "original_shape": "(3, 31)",
+      "augmented_shape": "(6, 31)",
+      "augmentation_factor": 2.0
+    },
+    "interaction": {
+      "original_shape": "(3, 2063)",
+      "augmented_shape": "(6, 2063)",
+      "augmentation_factor": 2.0
+    },
+    "target": {
+      "original_shape": "(3, 8)",
+      "augmented_shape": "(6, 8)",
+      "augmentation_factor": 2.0
+    }
+  },
+  "class_distribution": {
+    "antagonist": 4,
+    "agonist": 6
+  }
+}
